@@ -1,8 +1,8 @@
-# NephroAI — Clinical CKD Prediction System
+# NephroAI
 
 <div align="center">
 
-![NephroAI Banner](https://img.shields.io/badge/NephroAI-Clinical%20AI%20Platform-06B6D4?style=for-the-badge&logo=flask&logoColor=white)
+![NephroAI](https://img.shields.io/badge/NephroAI-CKD%20Prediction-06B6D4?style=for-the-badge&logo=flask&logoColor=white)
 &nbsp;
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 &nbsp;
@@ -12,24 +12,31 @@
 &nbsp;
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**A production-grade clinical decision support system for early Chronic Kidney Disease (CKD) detection using XGBoost and SHAP explainability.**
-
-[Live Demo](https://nephroai.netlify.app) · [Research Report](https://github.com/kaushik-parida/nephroai/blob/main/docs/report.pdf) · [API Reference](#api-reference)
+[Live Demo](https://nephroai.netlify.app) · [Notebook](notebooks/CKD_Prediction_Final_Year_Project.ipynb) · [API Reference](#api-reference)
 
 </div>
 
 ---
 
+This is our Final Year Research Project at SOA University (2025). The idea was to build something actually useful — a tool that can flag Chronic Kidney Disease early, when most patients have no symptoms yet.
+
+The project notebook is at [`notebooks/CKD_Prediction_Final_Year_Project.ipynb`](notebooks/CKD_Prediction_Final_Year_Project.ipynb) — it has all the data cleaning, model training, SHAP analysis, and the code that generated the `.pkl` model files.
+
+We trained and compared 8 different ML models on the UCI CKD dataset (400 patients, 24 features), and the final system uses XGBoost with SHAP explainability so you can see *why* it made a particular prediction, not just what it predicted. There's also a web interface where you can enter lab values and get an instant risk assessment.
+
+> **Note**: This is a research prototype, not a certified medical tool. Don't use it as the sole basis for any clinical decision.
+
+---
+
 ## Table of Contents
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [ML Pipeline](#ml-pipeline)
-- [Model Performance](#model-performance)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Local Development](#local-development)
-- [API Reference](#api-reference)
+- [What it does](#what-it-does)
+- [How the ML pipeline works](#how-the-ml-pipeline-works)
+- [Model results](#model-results)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Running it locally](#running-it-locally)
+- [API reference](#api-reference)
 - [Deployment](#deployment)
 - [Dataset](#dataset)
 - [Team](#team)
@@ -37,62 +44,54 @@
 
 ---
 
-## Overview
+## What it does
 
-NephroAI is a full-stack clinical AI platform that predicts Chronic Kidney Disease (CKD) risk from 24 biochemical and clinical biomarkers. The platform is built as part of a Final Year Research Project at SOA University (2025) and addresses the critical clinical challenge of **early, asymptomatic CKD detection**.
-
-The system trains and benchmarks 8 machine learning classifiers across 3 feature representations (Raw, PCA, LDA), selects the best-performing model (XGBoost), and deploys it with SHAP-based per-patient explainability through an interactive clinical web dashboard.
-
-> **Disclaimer**: NephroAI is a research prototype. It is not a certified medical device and should not be used as a sole basis for clinical decisions.
-
----
-
-## Key Features
-
-- **96.50% Test Accuracy** — XGBoost on raw 24 clinical features
-- **0.9913 AUC-ROC** — Excellent discrimination between CKD and healthy patients
-- **SHAP Explainability** — Individual biomarker impact breakdown for every prediction
-- **Dual-View Interface** — Clinical Portal (light) and Research Hub (dark) tabs
-- **Patient History** — localStorage-based prediction history with reload functionality
-- **OCR Lab Report Upload** — Tesseract.js auto-extracts values from uploaded lab reports
-- **Zero Data Leakage** — Strict train-first, split-first preprocessing pipeline
+- Takes 24 clinical biomarkers as input (blood urea, creatinine, hemoglobin, etc.)
+- Predicts CKD risk with 96.50% accuracy and a 0.9913 AUC-ROC score
+- Explains the prediction using SHAP — shows which values pushed the result up or down
+- Lets you upload a lab report PDF and auto-extract values via OCR (Tesseract.js)
+- Saves a history of past predictions in your browser locally
 
 ---
 
-## ML Pipeline
+## How the ML pipeline works
 
 ```
-Raw Dataset (2,000 patients, 24 features)
+Dataset: 2,000 records, 24 features (UCI CKD)
         │
         ▼
-Data Cleaning → Missing Value Imputation (Median/Mode)
+Fix dirty strings in categorical columns (tabs, leading spaces)
         │
         ▼
-Stratified 80:20 Train-Test Split  ← No leakage
+Impute missing values (median for numerical, mode for categorical)
+No rows dropped — all 2,000 records used
         │
         ▼
-SMOTE Balancing (Train only: 1,000 CKD → 1,000 Not-CKD)
+Stratified 80:20 split → 1,600 train / 400 test  ← split first, always
         │
-        ├──→ Raw Features (24)
-        ├──→ PCA (19 components, 95% variance)
-        └──→ LDA (1 dimension)
+        ▼
+SMOTE on training set only (balances CKD vs Not-CKD class ratio)
+        │
+        ├── Raw 24 features
+        ├── PCA → 19 components (95% variance retained)
+        └── LDA → 1 component
                 │
                 ▼
-    8 Classifiers × 3 Feature Sets = 24 Experiments
-    (10-Fold Stratified Cross-Validation)
+        8 models × 3 feature sets = 24 experiments
+        (10-fold stratified cross-validation throughout)
                 │
                 ▼
-    XGBoost (Raw) — Best performer → GridSearchCV tuning
+        XGBoost on raw features won → fine-tuned with 5-fold GridSearchCV
                 │
                 ▼
-    SHAP TreeExplainer → NephroAI Web App
+        Deployed with SHAP TreeExplainer
 ```
 
 ---
 
-## Model Performance
+## Model results
 
-All models evaluated on 400 unseen test patients (80:20 split).
+Evaluated on 400 held-out test patients (the 20% split, never seen during training or SMOTE).
 
 | Model               | CV Accuracy | Test Accuracy | AUC-ROC | F1-Score |
 |---------------------|:-----------:|:-------------:|:-------:|:--------:|
@@ -105,108 +104,81 @@ All models evaluated on 400 unseen test patients (80:20 split).
 | KNN                 | 95.35%      | 91.75%        | 0.9765  | 0.9333   |
 | Naïve Bayes         | 91.80%      | 88.25%        | 0.9591  | 0.9105   |
 
-> CV scores use **10-Fold Stratified Cross-Validation** applied to the SMOTE-balanced training set.
-> XGBoost was selected for deployment based on highest balanced F1, recall, and SHAP compatibility.
+We went with XGBoost over SVM (which had the same test accuracy) because SHAP has native, fast support for tree-based models, which made the explainability side much cleaner.
 
-**Tuned XGBoost Hyperparameters** (via 5-Fold GridSearchCV):
+**Final XGBoost hyperparameters** (tuned via 5-fold GridSearchCV):
 ```
-learning_rate=0.1 | max_depth=4 | n_estimators=100
-subsample=0.8 | colsample_bytree=0.8 | random_state=42
+learning_rate=0.1  |  max_depth=4  |  n_estimators=100
+subsample=0.8      |  colsample_bytree=0.8  |  random_state=42
 ```
 
 ---
 
-## Tech Stack
+## Tech stack
 
-| Layer       | Technology                               |
-|-------------|------------------------------------------|
-| **ML**      | XGBoost, scikit-learn, SHAP, pandas, numpy |
-| **Backend** | Python 3.10+, Flask 2.3, Flask-CORS, Gunicorn |
-| **Frontend** | Vanilla HTML5, TailwindCSS (CDN), Chart.js, Three.js |
-| **OCR**     | Tesseract.js (in-browser)               |
-| **Hosting** | Netlify (frontend) + Render (backend)   |
-| **Storage** | Browser localStorage (patient history) |
+| Layer       | Tools |
+|-------------|-------|
+| ML          | XGBoost, scikit-learn, SHAP, pandas, numpy |
+| Backend     | Python 3.10+, Flask, Flask-CORS, Gunicorn |
+| Frontend    | HTML5, TailwindCSS (CDN), Chart.js, Three.js |
+| OCR         | Tesseract.js (runs entirely in the browser) |
+| Hosting     | Netlify (frontend) + Render (backend) |
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 NephroAI_App/
-├── app.py                  # Flask REST API backend
-├── requirements.txt        # Python dependencies
-├── netlify.toml            # Netlify frontend deployment config
-├── .gitignore
-├── xgboost_ckd_model.pkl   # Trained XGBoost model (serialized)
-├── scaler.pkl              # Fitted MinMaxScaler (serialized)
-└── nephroai/               # Frontend static files
-    ├── index.html          # Main SPA (2,100+ lines, Tailwind + Three.js)
-    ├── app.js              # Frontend logic (SHAP charts, OCR, chatbot, history)
-    ├── style.css           # Custom CSS (glassmorphism, animations, chatbot)
-    └── kidney3d.png        # Anatomical kidney diagram
+├── app.py                    # Flask API — prediction, model data, static serving
+├── requirements.txt
+├── netlify.toml              # Netlify deploy config
+├── xgboost_ckd_model.pkl     # Trained XGBoost model
+├── scaler.pkl                # Fitted MinMaxScaler
+├── data/
+│   └── kidney_disease.csv    # Full 2,000-record UCI CKD dataset
+├── notebooks/
+│   └── CKD_Prediction_Final_Year_Project.ipynb
+└── nephroai/
+    ├── index.html
+    ├── app.js
+    ├── style.css
+    └── kidney3d.png
 ```
 
 ---
 
-## Local Development
+## Running it locally
 
-### Prerequisites
-
-- Python 3.10+
-- pip or pipenv
-
-### 1. Clone the repository
+You need Python 3.10+ installed.
 
 ```bash
 git clone https://github.com/kaushik-parida/nephroai.git
 cd nephroai
-```
-
-### 2. Install Python dependencies
-
-```bash
 pip install -r requirements.txt
-```
-
-### 3. Run the backend server
-
-```bash
 python app.py
-# Server starts at http://127.0.0.1:5000
 ```
 
-### 4. Open the frontend
-
-Open your browser and navigate to:
-```
-http://127.0.0.1:5000
-```
-
-> The Flask server simultaneously serves the static frontend from the `nephroai/` folder.
+Then open `http://127.0.0.1:5000` in your browser. Flask serves both the API and the frontend from the same server.
 
 ---
 
-## API Reference
-
-All endpoints return JSON. CORS is enabled for all origins.
+## API reference
 
 ### `GET /api/status`
-Returns the current server and model load status.
 
-**Response:**
+Quick check to confirm the server is up and the model is loaded.
+
 ```json
-{
-  "status": "active",
-  "models_loaded": true
-}
+{ "status": "active", "models_loaded": true }
 ```
 
 ---
 
 ### `GET /api/models-data`
-Returns benchmark performance metrics for all 8 models.
 
-**Response:**
+Returns the benchmark results for all 8 models (used by the Research section charts).
+
 ```json
 {
   "models": [
@@ -219,9 +191,10 @@ Returns benchmark performance metrics for all 8 models.
 ---
 
 ### `POST /api/predict`
-Runs a CKD risk prediction for a given patient's biomarkers.
 
-**Request Body:**
+Send a patient's 24 biomarker values and get back a risk score with SHAP explanations.
+
+**Request body:**
 ```json
 {
   "age": 68, "bp": 90, "sg": 1.010, "al": 4, "su": 3,
@@ -239,17 +212,12 @@ Runs a CKD risk prediction for a given patient's biomarkers.
   "prediction": 1,
   "shap_values": [
     { "feature": "hemo", "value": 0.412 },
-    { "feature": "sc",   "value": 0.338 },
-    ...
+    { "feature": "sc",   "value": 0.338 }
   ]
 }
 ```
 
-| Field         | Type    | Description                              |
-|---------------|---------|------------------------------------------|
-| `probability` | float   | CKD risk score (0.0 – 1.0)              |
-| `prediction`  | int     | `1` = CKD, `0` = Healthy                |
-| `shap_values` | array   | Top 10 features by absolute SHAP impact |
+`prediction` is `1` for CKD and `0` for healthy. `shap_values` contains the top 10 features ranked by impact magnitude.
 
 ---
 
@@ -257,57 +225,51 @@ Runs a CKD risk prediction for a given patient's biomarkers.
 
 ### Frontend → Netlify
 
-The `netlify.toml` in the repo root automates the deployment configuration.
-
-1. Push this repository to GitHub.
-2. Log in to [netlify.com](https://netlify.com) → **Add new site** → **Import from Git**.
-3. Select your repository and apply these settings:
-   - **Publish directory**: `nephroai`
-   - *(Auto-detected from `netlify.toml`)*
-4. Click **Deploy site**. ✅
+1. Push the repo to GitHub.
+2. On [netlify.com](https://netlify.com), go to **Add new site → Import from Git** and select this repo.
+3. Netlify will auto-read the `netlify.toml` and set the publish directory to `nephroai`.
+4. Hit **Deploy**.
 
 ### Backend → Render
 
-1. Log in to [render.com](https://render.com) → **New Web Service** → connect GitHub repo.
-2. Apply these settings:
-   - **Runtime**: Python 3
-   - **Build command**: `pip install -r requirements.txt`
-   - **Start command**: `gunicorn app:app`
-3. Click **Deploy**. Copy the live URL (e.g., `https://nephroai-api.onrender.com`).
-4. Update the `API_BASE_URL` constant in `nephroai/app.js` with your Render URL.
-5. Commit and push — Netlify auto-redeploys.
+1. On [render.com](https://render.com), create a **New Web Service** and connect this GitHub repo.
+2. Set the build command to `pip install -r requirements.txt` and start command to `gunicorn app:app`.
+3. After it deploys, copy the URL (looks like `https://nephroai-api.onrender.com`).
+4. Paste it into the `API_BASE_URL` variable at the top of `nephroai/app.js`, commit, and push. Netlify will redeploy automatically.
 
 ---
 
 ## Dataset
 
-- **Source**: [UCI Machine Learning Repository — CKD Dataset](https://archive.ics.uci.edu/dataset/336/chronic+kidney+disease)
-- **Records**: 2,000 patients
-- **Features**: 24 clinical attributes (11 numerical, 13 categorical)
-- **Classes**: CKD (1,250) / Not-CKD (750) — balanced via SMOTE
+UCI Machine Learning Repository — [Chronic Kidney Disease dataset](https://archive.ics.uci.edu/dataset/336/chronic+kidney+disease)
+
+- 2,000 patient records; missing values filled via median/mode imputation (no rows dropped)
+- 24 features (11 numerical, 13 categorical)
+- 80:20 stratified split → 1,600 train / 400 test
+- Class imbalance in the training set handled with SMOTE
 
 ---
 
 ## Team
 
-**Group 11 — Final Year Research Project, SOA University (2025)**
+Group 11 — B.Tech Final Year, SOA University (2025)
 
-| Student              | Roll Number  | Contribution                                        |
-|----------------------|:------------:|-----------------------------------------------------|
-| Kaushik Parida       | 2241016196   | Lead ML Engineer, Full-Stack Dev, Documentation     |
-| Madhumita Parida     | 2241016198   | Literature Survey, Problem Formulation              |
-| Prakash Shaw         | 2241019425   | Experimentation, Result Analysis                    |
-| Ankit Bisoyi         | 2241002190   | Result Validation, Documentation                   |
-| Tatwaprakash Mishra  | 2241013193   | Result Validation, Documentation                   |
+| Student              | Roll No.     | Contribution                              |
+|----------------------|:------------:|-------------------------------------------|
+| Kaushik Parida       | 2241016196   | ML experiments, web app, documentation    |
+| Madhumita Parida     | 2241016198   | Literature survey, problem formulation    |
+| Prakash Shaw         | 2241019425   | Experimentation, result analysis          |
+| Ankit Bisoyi         | 2241002190   | Result validation, documentation          |
+| Tatwaprakash Mishra  | 2241013193   | Result validation, documentation          |
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ at SOA University, Bhubaneswar · 2025</sub>
+  <sub>SOA University, Bhubaneswar · 2025</sub>
 </div>
