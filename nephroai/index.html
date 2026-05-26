@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NephroAI - Clinical CKD Prediction</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        medical: {
+                            bg: '#F8FAFC',
+                            white: '#FFFFFF',
+                            primary: '#0F172A', // Deep Blue/Slate
+                            secondary: '#475569',
+                            accent: '#06B6D4', // Cyan
+                            accentHover: '#0891B2',
+                            red: '#EF4444',
+                            green: '#10B981',
+                            border: '#E2E8F0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        /* Highly Modern Global Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F8FAFC; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 9999px;
+            border: 2.5px solid #F8FAFC;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06B6D4; /* Medical Cyan on hover */
+        }
+
+        /* Custom scrollbar for form panel */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #E2E8F0;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #06B6D4;
+        }
+
+        section { scroll-margin-top: 5rem; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Fix Tailwind hidden+flex conflict */
+        .result-active-show { display: flex !important; }
+
+        /* Kidney image subtle parallax glow */
+        #kidney-img {
+            filter: drop-shadow(0 0 40px rgba(6,182,212,0.35));
+            transition: transform 0.6s ease, filter 0.6s ease;
+        }
+        #kidney-img:hover {
+            transform: scale(1.03) translateY(-6px);
+            filter: drop-shadow(0 0 60px rgba(6,182,212,0.55));
+        }
+
+        /* Pipeline arrow connectors */
+        .pipe-connector {
+            position: absolute;
+            top: 50%;
+            right: -20px;
+            transform: translateY(-50%);
+            color: #CBD5E1;
+            font-size: 1.25rem;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* Logo link hover */
+        .logo-link { transition: opacity 0.2s; }
+        .logo-link:hover { opacity: 0.8; }
+
+        /* ══════════════════════════════════════
+           PREDICTOR TABS & PRESETS (LIGHT THEME)
+           ══════════════════════════════════════ */
+        .tab-btn-active {
+            color: #06B6D4 !important;
+            border-bottom-color: #06B6D4 !important;
+            background: #ffffff;
+        }
+
+        /* ══════════════════════════════════════
+           RESEARCH VIEW STYLES (DARK GRAPHICS)
+           ══════════════════════════════════════ */
+        #research {
+            background: linear-gradient(180deg, #050D1A 0%, #0B1628 50%, #050D1A 100%);
+            border-top: 1px solid rgba(0, 212, 212, 0.12);
+            border-bottom: 1px solid rgba(0, 212, 212, 0.12);
+            position: relative;
+            overflow: hidden;
+            padding: 6rem 2rem;
+            color: #F0F4F8;
+        }
+
+        .particle-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #research .section-inner {
+            position: relative;
+            z-index: 2;
+            max-width: 7xl;
+            margin: 0 auto;
+        }
+
+        /* 3D Flip Cards */
+        .flip-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+            margin-top: 3rem;
+        }
+
+        @media (max-width: 1024px) {
+            .flip-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 640px) {
+            .flip-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .flip-card {
+            background: transparent;
+            perspective: 1000px;
+            height: 220px;
+            cursor: pointer;
+        }
+
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .flip-card:hover .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 16px;
+            border: 1px solid rgba(0,212,212,0.12);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .flip-card-front {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(10px);
+            color: #F0F4F8;
+        }
+
+        .flip-card-back {
+            background: rgba(11, 22, 40, 0.95);
+            backdrop-filter: blur(10px);
+            color: #8899AA;
+            transform: rotateY(180deg);
+            font-size: 0.82rem;
+            line-height: 1.5;
+            text-align: left;
+            justify-content: flex-start;
+        }
+
+        .flip-card-back h4 {
+            color: #00D4D4;
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+            border-bottom: 1px solid rgba(0,212,212,0.12);
+            padding-bottom: 0.25rem;
+            width: 100%;
+        }
+
+        .flip-card-metric {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #00D4D4;
+        }
+
+        /* XGBoost Spotlight */
+        .xgboost-spotlight {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);
+            border: 2px solid #00D4D4;
+            box-shadow: 0 0 30px rgba(6, 182, 212, 0.15);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-top: 4rem;
+            position: relative;
+            overflow: hidden;
+            text-align: left;
+        }
+
+        .xgboost-spotlight::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 60%);
+            pointer-events: none;
+            animation: pulse-glow 6s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(0.9); opacity: 0.5; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
+
+        /* ══════════════════════════════════════
+           AI CHATBOT STYLES
+           ══════════════════════════════════════ */
+        .chatbot-widget {
+            position: fixed;
+            bottom: 25px; right: 25px;
+            z-index: 3000;
+        }
+
+        .chatbot-btn {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: #06B6D4;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            transition: all 0.3s ease;
+        }
+
+        .chatbot-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .chatbot-panel {
+            position: absolute;
+            bottom: 75px; right: 0;
+            width: 350px; height: 450px;
+            background: #0F172A;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateY(20px) scale(0.95);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .chatbot-panel.open {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .chatbot-header {
+            padding: 1rem;
+            background: #1E293B;
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #ffffff;
+        }
+
+        .chatbot-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: rgba(6, 182, 212, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #06B6D4;
+            font-weight: bold;
+        }
+
+        .chatbot-header-text h4 {
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .chatbot-header-text p {
+            font-size: 0.7rem;
+            color: #94A3B8;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .chat-bubble {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.82rem;
+            line-height: 1.4;
+        }
+
+        .chat-bubble-bot {
+            background: #F1F5F9;
+            color: #1E293B;
+            align-self: flex-start;
+            border-top-left-radius: 0;
+        }
+
+        .chat-bubble-user {
+            background: #06B6D4;
+            color: #ffffff;
+            align-self: flex-end;
+            border-top-right-radius: 0;
+            font-weight: 500;
+        }
+
+        .chatbot-input-container {
+            padding: 0.75rem;
+            border-top: 1px solid #E2E8F0;
+            display: flex;
+            gap: 0.5rem;
+            background: #F8FAFC;
+        }
+
+        .chatbot-input {
+            flex: 1;
+            background: #ffffff;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            color: #0F172A;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .chatbot-send-btn {
+            background: #06B6D4;
+            border: none;
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .chatbot-send-btn:hover {
+            background: #0891B2;
+        }
+
+        /* ══════════════════════════════════════
+           PATIENT HISTORY STYLES
+           ══════════════════════════════════════ */
+        .history-sidebar {
+            position: fixed;
+            top: 0; right: -400px;
+            width: 400px; height: 100vh;
+            background: #ffffff;
+            border-left: 1px solid #E2E8F0;
+            z-index: 2000;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.05);
+            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            color: #0F172A;
+        }
+
+        .history-sidebar.open {
+            right: 0;
+        }
+
+        .history-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #F8FAFC;
+        }
+
+        .history-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .history-close {
+            background: transparent;
+            border: none;
+            color: #94A3B8;
+            font-size: 1.25rem;
+            cursor: pointer;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .history-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .history-card:hover {
+            background: #ECFDF5;
+            border-color: #10B981;
+        }
+
+        .history-card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .history-patient-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .history-badge {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 100px;
+            font-weight: 700;
+        }
+
+        .history-badge.danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #EF4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .history-badge.safe {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10B981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(2px);
+            z-index: 1999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="bg-medical-bg text-medical-primary font-sans antialiased selection:bg-medical-accent selection:text-white">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full top-0 z-50 glass-panel border-b border-medical-border transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <!-- Logo — clickable, returns to hero -->
+                <a href="#hero" class="logo-link flex items-center gap-2" aria-label="NephroAI - Back to top">
+                    <svg class="w-8 h-8 text-medical-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    <span class="text-2xl font-bold tracking-tight text-medical-primary">Nephro<span class="text-medical-accent">AI</span></span>
+                    <span class="relative flex h-3 w-3 ml-1">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-medical-accent opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 bg-medical-accent"></span>
+                    </span>
+                </a>
+                
+                <!-- Navbar Tabs (Clinical Dashboard vs Research Hub) -->
+                <div class="hidden md:flex space-x-6 items-center">
+                    <button id="nav-btn-clinical" class="text-medical-accent font-semibold transition-colors border-b-2 border-medical-accent pb-1 focus:outline-none">Clinical Portal</button>
+                    <button id="nav-btn-research" class="text-medical-secondary hover:text-medical-accent font-medium transition-colors pb-1 focus:outline-none">Research Hub</button>
+                </div>
+                
+                <!-- CTA / Actions -->
+                <div class="flex items-center gap-4">
+                    <!-- History Button (Clinical View only) -->
+                    <button id="btn-history-open" class="clinical-view text-medical-secondary hover:text-medical-accent font-medium transition-colors flex items-center gap-1.5 bg-transparent border-none cursor-pointer focus:outline-none">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        History
+                    </button>
+                    <a href="#predict" class="clinical-view bg-medical-accent hover:bg-medical-accentHover text-white px-6 py-2.5 rounded-lg font-semibold shadow-md shadow-cyan-500/30 transition-all flex items-center gap-2">
+                        Run Prediction <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ==========================================
+         CLINICAL PORTAL VIEW (ORIGINAL LIGHT THEME)
+         ========================================== -->
+    
+    <!-- Hero Section -->
+    <section id="hero" class="clinical-view pt-32 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <!-- Left Text -->
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-medical-accent text-sm font-semibold mb-6">
+                    <span class="w-2 h-2 rounded-full bg-medical-accent animate-pulse"></span>
+                    Clinical-Grade Machine Learning
+                </div>
+                <h1 class="text-5xl md:text-6xl font-extrabold text-medical-primary leading-tight mb-6">
+                    Predicting Renal Risk with <span class="text-transparent bg-clip-text bg-gradient-to-r from-medical-accent to-blue-600">Absolute Precision</span>.
+                </h1>
+                <p class="text-lg text-medical-secondary mb-8 leading-relaxed max-w-xl">
+                    Empowering nephrologists with highly accurate, transparent, and explainable AI. Powered by XGBoost and SHAP for clinical trustworthiness.
+                </p>
+                <div class="flex gap-4">
+                    <a href="#predict" class="bg-medical-primary hover:bg-slate-800 text-white px-8 py-3.5 rounded-xl font-semibold shadow-lg transition-all text-lg">
+                        Start Diagnosis
+                    </a>
+                    <a href="#analytics" class="bg-white hover:bg-gray-50 text-medical-primary border border-gray-200 px-8 py-3.5 rounded-xl font-semibold shadow-sm transition-all text-lg flex items-center gap-2">
+                        View Analytics
+                    </a>
+                </div>
+                
+                <!-- Stat Grid BELOW Hero Text (Fixing overlap issue) -->
+                <div class="grid grid-cols-2 gap-4 mt-12">
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                        <p class="text-sm text-medical-secondary font-medium uppercase tracking-wide mb-1">Model Accuracy</p>
+                        <p class="text-3xl font-bold text-medical-primary">97.6%</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                        <p class="text-sm text-medical-secondary font-medium uppercase tracking-wide mb-1">AUC-ROC Score</p>
+                        <p class="text-3xl font-bold text-medical-accent">0.9913</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right — AI-generated medical kidney visual -->
+            <div class="relative h-[520px] bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/40 rounded-3xl border border-cyan-100 shadow-2xl overflow-hidden flex items-center justify-center">
+                <!-- Decorative rings -->
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-72 h-72 rounded-full border border-cyan-100/60 animate-pulse"></div>
+                    <div class="absolute w-52 h-52 rounded-full border border-cyan-200/50"></div>
+                </div>
+                <!-- Anatomical kidney image -->
+                <img
+                    id="kidney-img"
+                    src="kidney3d.png"
+                    alt="3D Human Kidney — Renal Anatomy"
+                    class="relative z-10 w-full h-full object-contain p-6"
+                />
+                <!-- Caption badge -->
+                <div class="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-1.5 rounded-full text-xs font-semibold text-medical-secondary border border-gray-200 shadow-sm z-20 whitespace-nowrap">
+                    Renal Anatomy · Clinical AI Analysis
+                </div>
+                <!-- Floating stat chips -->
+                <div class="absolute top-5 left-5 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl border border-gray-200 shadow-sm z-20">
+                    <p class="text-[10px] font-bold text-medical-secondary uppercase tracking-wider">Sensitivity</p>
+                    <p class="text-base font-extrabold text-medical-green">98.3%</p>
+                </div>
+                <div class="absolute top-5 right-5 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl border border-gray-200 shadow-sm z-20">
+                    <p class="text-[10px] font-bold text-medical-secondary uppercase tracking-wider">Specificity</p>
+                    <p class="text-base font-extrabold text-medical-accent">96.7%</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Overview Section (Stats & Key Innovations) -->
+    <section id="overview" class="clinical-view py-24 bg-white border-y border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Stats Strip -->
+            <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200 text-center pb-16 border-b border-gray-100">
+                <div class="px-4">
+                    <p class="text-4xl font-extrabold text-medical-primary mb-2">2,000</p>
+                    <p class="text-sm font-semibold text-medical-secondary uppercase tracking-wider">Patient Records</p>
+                </div>
+                <div class="px-4">
+                    <p class="text-4xl font-extrabold text-medical-primary mb-2">24</p>
+                    <p class="text-sm font-semibold text-medical-secondary uppercase tracking-wider">Clinical Biomarkers</p>
+                </div>
+                <div class="px-4">
+                    <p class="text-4xl font-extrabold text-medical-primary mb-2">8</p>
+                    <p class="text-sm font-semibold text-medical-secondary uppercase tracking-wider">Models Evaluated</p>
+                </div>
+                <div class="px-4">
+                    <p class="text-4xl font-extrabold text-medical-accent mb-2">0</p>
+                    <p class="text-sm font-semibold text-medical-secondary uppercase tracking-wider">Data Leakage</p>
+                </div>
+            </div>
+
+            <!-- Innovations Grid -->
+            <div class="mt-16">
+                <div class="text-center mb-12">
+                    <span class="text-medical-accent font-bold tracking-widest uppercase text-sm">Key Innovations</span>
+                    <h2 class="text-3xl font-bold text-medical-primary mt-2">Core Clinical & Technical Contributions</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <!-- Card 1 -->
+                    <div class="bg-medical-bg p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-50 flex items-center justify-center mb-4 text-medical-accent">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-medical-primary mb-2">Zero Leakage</h3>
+                        <p class="text-sm text-medical-secondary leading-relaxed">Train-Test split enforced strictly before SMOTE, eliminating the common inflation flaw in existing papers.</p>
+                    </div>
+                    <!-- Card 2 -->
+                    <div class="bg-medical-bg p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-4 text-blue-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-medical-primary mb-2">SHAP Explainability</h3>
+                        <p class="text-sm text-medical-secondary leading-relaxed">Mathematical decisions are translated into per-patient biomarker impacts for deep clinical transparency.</p>
+                    </div>
+                    <!-- Card 3 -->
+                    <div class="bg-medical-bg p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-50 flex items-center justify-center mb-4 text-medical-accent">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-medical-primary mb-2">8-Model Benchmark</h3>
+                        <p class="text-sm text-medical-secondary leading-relaxed">Rigorous evaluation of 8 algorithms using 10-Fold Stratified CV to prove XGBoost's superiority.</p>
+                    </div>
+                    <!-- Card 4 -->
+                    <div class="bg-medical-bg p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-4 text-blue-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-medical-primary mb-2">Clinical Mapping</h3>
+                        <p class="text-sm text-medical-secondary leading-relaxed">Features aren't just variables; they are mapped directly to their pathophysiological significance.</p>
+                    </div>
+                    <!-- Card 5 -->
+                    <div class="bg-medical-bg p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-50 flex items-center justify-center mb-4 text-medical-accent">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-medical-primary mb-2">Live Deployment</h3>
+                        <p class="text-sm text-medical-secondary leading-relaxed">A fully functional, publicly accessible web tool bridging the gap between research and clinical practice.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ML Pipeline Section -->
+    <section id="pipeline" class="clinical-view py-24 bg-white border-y border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+            <div class="text-center mb-10">
+                <span class="text-medical-accent font-bold tracking-widest uppercase text-sm">Diagnostic Workflow</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-medical-primary mt-2">End-to-End Pipeline</h2>
+            </div>
+            
+            <div class="relative">
+                <!-- Connecting Line -->
+                <div class="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-gray-100 -translate-y-1/2 z-0"></div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-4 relative z-10">
+                    <!-- Step 1 -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-medical-primary text-white flex items-center justify-center font-bold mb-3">1</div>
+                        <h4 class="font-bold text-medical-primary text-sm">Data Input</h4>
+                        <p class="text-xs text-medical-secondary mt-1">2,000 Records</p>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-gray-100 text-medical-primary flex items-center justify-center font-bold mb-3">2</div>
+                        <h4 class="font-bold text-medical-primary text-sm">Imputation</h4>
+                        <p class="text-xs text-medical-secondary mt-1">Median/Mode</p>
+                    </div>
+                    <!-- Step 3 (Highlight) -->
+                    <div class="bg-cyan-50 p-4 rounded-xl border-2 border-medical-accent shadow-md text-center transform scale-105">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-medical-accent text-white flex items-center justify-center font-bold mb-3">3</div>
+                        <h4 class="font-bold text-medical-primary text-sm">Stratified Split</h4>
+                        <p class="text-xs text-medical-accent font-semibold mt-1">Zero Leakage</p>
+                    </div>
+                    <!-- Step 4 -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-gray-100 text-medical-primary flex items-center justify-center font-bold mb-3">4</div>
+                        <h4 class="font-bold text-medical-primary text-sm">SMOTE</h4>
+                        <p class="text-xs text-medical-secondary mt-1">Train set only</p>
+                    </div>
+                    <!-- Step 5 -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-gray-100 text-medical-primary flex items-center justify-center font-bold mb-3">5</div>
+                        <h4 class="font-bold text-medical-primary text-sm">XGBoost</h4>
+                        <p class="text-xs text-medical-secondary mt-1">GridSearchCV</p>
+                    </div>
+                    <!-- Step 6 -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-blue-600 text-white flex items-center justify-center font-bold mb-3">6</div>
+                        <h4 class="font-bold text-medical-primary text-sm">SHAP</h4>
+                        <p class="text-xs text-medical-secondary mt-1">Explainability</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Predictive Diagnostic Section -->
+    <section id="predict" class="clinical-view pt-2 pb-24 bg-medical-bg flex flex-col justify-center">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+            <div class="mb-6">
+                <span class="text-medical-accent font-bold tracking-widest uppercase text-sm">Live Clinical Tool</span>
+                <h2 class="text-3xl font-bold text-medical-primary mt-1">Renal Risk Diagnostic</h2>
+            </div>
+            
+            <!-- Enforced height container triggers inner scrolling and prevents layout bleeding -->
+            <div class="h-[550px] w-full">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
+                
+                <!-- Left: Scrollable Input Form with Tabs and Presets (Light Theme) -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
+                    <!-- Tabs Header -->
+                    <div class="flex border-b border-gray-200 shrink-0 bg-gray-50">
+                        <button type="button" id="tab-manual-entry" class="flex-1 py-3 text-sm font-semibold text-medical-accent border-b-2 border-medical-accent bg-white focus:outline-none">Manual Entry</button>
+                        <button type="button" id="tab-upload-report" class="flex-1 py-3 text-sm font-semibold text-medical-secondary hover:text-medical-primary transition-colors border-b-2 border-transparent focus:outline-none">Upload Lab Report</button>
+                    </div>
+                    
+                    <div class="p-5 border-b border-gray-100 bg-white shrink-0">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <label for="patient-name-input" class="text-xs font-bold text-medical-secondary uppercase tracking-wider">Patient Name:</label>
+                                <input type="text" id="patient-name-input" placeholder="Anonymous" class="rounded-lg border-gray-200 text-xs py-1.5 px-3 border bg-white focus:outline-none focus:border-medical-accent text-medical-primary w-40" />
+                            </div>
+                            <!-- Preset Datasets -->
+                            <div class="flex gap-2">
+                                <button type="button" id="btn-preset-healthy" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-medical-green border border-green-200 hover:bg-green-100 transition-colors">
+                                    Healthy Case
+                                </button>
+                                <button type="button" id="btn-preset-ckd" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-medical-red border border-red-200 hover:bg-red-100 transition-colors">
+                                    CKD Case
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Manual Form Container -->
+                    <div id="manual-form-container" class="p-5 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                        <form id="ckd-form">
+                            <!-- Numerical Group -->
+                            <div class="mb-6">
+                                <h4 class="text-xs font-bold text-medical-accent uppercase tracking-wider mb-4 border-b pb-2">Numerical Metrics</h4>
+                                <div class="grid grid-cols-2 gap-4" id="form-num-grid">
+                                    <!-- Rendered via JS -->
+                                </div>
+                            </div>
+                            <!-- Categorical Group -->
+                            <div>
+                                <h4 class="text-xs font-bold text-medical-accent uppercase tracking-wider mb-4 border-b pb-2">Categorical Indicators</h4>
+                                <div class="grid grid-cols-2 gap-4" id="form-cat-grid">
+                                    <!-- Rendered via JS -->
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- OCR Upload Container -->
+                    <div id="ocr-upload-container" class="p-8 overflow-y-auto custom-scrollbar flex-1 hidden flex flex-col justify-center items-center bg-white">
+                        <div id="upload-zone" class="border-2 border-dashed border-gray-200 hover:border-medical-accent hover:bg-cyan-50/10 rounded-xl p-8 text-center cursor-pointer transition-all w-full flex flex-col items-center gap-3">
+                            <span class="text-4xl text-medical-accent">🖻</span>
+                            <h4 class="font-bold text-medical-primary text-sm">Drag & Drop Lab Report</h4>
+                            <p class="text-xs text-medical-secondary max-w-xs">Upload an image of the patient's lab report (PNG, JPG, or PDF). Tesseract.js will scan and parse the values.</p>
+                            <button type="button" class="mt-2 bg-medical-accent hover:bg-cyan-500/90 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md transition-all">Browse Files</button>
+                            <input type="file" id="ocr-file-input" class="hidden" accept="image/*" />
+                        </div>
+
+                        <!-- OCR Progress Bar -->
+                        <div id="ocr-status" class="w-full mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4 hidden">
+                            <div class="flex justify-between items-center mb-2">
+                                <span id="ocr-progress-text" class="text-xs font-bold text-medical-primary">Extracting text...</span>
+                            </div>
+                            <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                <div id="ocr-progress" class="bg-medical-accent h-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-5 border-t border-gray-100 bg-gray-50 shrink-0">
+                        <button type="submit" form="ckd-form" id="predict-btn" class="w-full bg-medical-accent hover:bg-medical-accentHover text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2">
+                            <span id="btn-text">Run Diagnostic Analysis</span>
+                            <svg id="btn-loader" class="animate-spin h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: Sticky/Fixed Result Panel -->
+                <div class="flex flex-col gap-6 h-full">
+                    <!-- Placeholder state -->
+                    <div id="result-placeholder" class="bg-white rounded-2xl shadow-sm border border-gray-200 flex-1 flex flex-col items-center justify-center p-8 text-center h-full">
+                        <div class="w-16 h-16 bg-blue-50 text-blue-300 rounded-full flex items-center justify-center mb-4">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-medical-primary mb-2">Awaiting Patient Data</h3>
+                        <p class="text-sm text-medical-secondary max-w-xs">Run the diagnostic analysis to view the AI verdict and SHAP biomarker explanations here.</p>
+                    </div>
+
+                    <!-- Active state (Hidden initially) -->
+                    <div id="result-active" class="hidden flex-col gap-6 h-full">
+                        <!-- Verdict Card -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 shrink-0">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="font-bold text-medical-primary">Clinical Verdict</h3>
+                                <span id="verdict-badge" class="px-3 py-1 rounded-full text-xs font-bold border"></span>
+                            </div>
+                            
+                            <div class="flex items-center gap-8">
+                                <div class="relative w-32 h-32 flex-shrink-0">
+                                    <canvas id="gaugeCanvas" width="128" height="128"></canvas>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center mt-4">
+                                        <span id="gauge-pct" class="text-2xl font-extrabold text-medical-primary tracking-tight">0%</span>
+                                        <span class="text-[10px] text-medical-secondary font-bold uppercase tracking-wider">CKD Risk</span>
+                                    </div>
+                                </div>
+                                <div class="flex-1 flex flex-col gap-3">
+                                    <div id="recommendation" class="text-sm text-medical-secondary bg-gray-50 p-4 rounded-xl border-l-4"></div>
+                                    <!-- Save to History Button -->
+                                    <button type="button" id="btn-save-history" class="hidden bg-medical-accent hover:bg-medical-accentHover text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md transition-all self-start flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                        Save to History
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SHAP Card -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex-1 flex flex-col min-h-0">
+                            <div class="flex justify-between items-center mb-2 shrink-0">
+                                <h3 class="font-bold text-medical-primary">SHAP Biomarker Impact</h3>
+                            </div>
+                            <p class="text-xs text-medical-secondary mb-4 shrink-0">Top 10 features driving this specific diagnosis.</p>
+                            
+                            <div class="flex-1 min-h-0 relative w-full h-full">
+                                <canvas id="shapChart"></canvas>
+                            </div>
+                            
+                            <div class="flex gap-4 mt-4 text-xs font-medium text-medical-secondary shrink-0 justify-center">
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-medical-red"></span> Increases Risk</span>
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-medical-accent"></span> Decreases Risk</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Analytics Section -->
+    <section id="analytics" class="clinical-view py-24 bg-white border-y border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <span class="text-medical-accent font-bold tracking-widest uppercase text-sm">Model Evaluation</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-medical-primary mt-2">Performance Dashboard</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                    <h3 class="font-bold text-medical-primary mb-6">Algorithm Benchmark (AUC-ROC)</h3>
+                    <canvas id="modelChart" height="120"></canvas>
+                </div>
+                <div class="bg-medical-bg rounded-2xl border border-gray-200 shadow-sm p-6">
+                    <h3 class="font-bold text-medical-primary mb-4">Why XGBoost?</h3>
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-start gap-3 text-sm text-medical-secondary"><svg class="w-5 h-5 text-medical-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Captures non-linear biological data</li>
+                        <li class="flex items-start gap-3 text-sm text-medical-secondary"><svg class="w-5 h-5 text-medical-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> L1/L2 Regularization</li>
+                        <li class="flex items-start gap-3 text-sm text-medical-secondary"><svg class="w-5 h-5 text-medical-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Native SHAP TreeExplainer</li>
+                    </ul>
+                    <div class="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center">
+                        <div class="text-center"><p class="text-xs text-gray-500 font-bold uppercase">Accuracy</p><p class="text-lg font-bold text-medical-primary">97.6%</p></div>
+                        <div class="text-center"><p class="text-xs text-gray-500 font-bold uppercase">AUC</p><p class="text-lg font-bold text-medical-accent">0.9913</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Section -->
+    <section id="team" class="clinical-view py-32 bg-medical-bg flex flex-col justify-center">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+            <div class="text-center mb-16">
+                <span class="text-medical-accent font-bold tracking-widest uppercase text-sm">Researchers</span>
+                <h2 class="text-3xl font-bold text-medical-primary mt-2">Group 11 — SOA University</h2>
+            </div>
+            
+            <!-- Perfect 5 col grid -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+                    <div class="w-16 h-16 mx-auto rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">KP</div>
+                    <h4 class="font-bold text-medical-primary text-sm">Kaushik Parida</h4>
+                    <p class="text-xs text-medical-secondary mt-1">2241016196</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+                    <div class="w-16 h-16 mx-auto rounded-xl bg-cyan-50 text-medical-accent flex items-center justify-center font-bold text-xl mb-4">PS</div>
+                    <h4 class="font-bold text-medical-primary text-sm">Prakash Shaw</h4>
+                    <p class="text-xs text-medical-secondary mt-1">2241019425</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+                    <div class="w-16 h-16 mx-auto rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">AB</div>
+                    <h4 class="font-bold text-medical-primary text-sm">Ankit Bisoyi</h4>
+                    <p class="text-xs text-medical-secondary mt-1">2241002190</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+                    <div class="w-16 h-16 mx-auto rounded-xl bg-cyan-50 text-medical-accent flex items-center justify-center font-bold text-xl mb-4">MP</div>
+                    <h4 class="font-bold text-medical-primary text-sm">Madhumita Parida</h4>
+                    <p class="text-xs text-medical-secondary mt-1">2241016198</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+                    <div class="w-16 h-16 mx-auto rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">TM</div>
+                    <h4 class="font-bold text-medical-primary text-sm">Tatwaprakash Mishra</h4>
+                    <p class="text-xs text-medical-secondary mt-1">2241013093</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==========================================
+         RESEARCH HUB VIEW (DARK METRICS & VISUALS)
+         ========================================== -->
+    <section id="research" class="research-view hidden">
+        <canvas id="research-particles-canvas" class="particle-canvas"></canvas>
+        <div class="section-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <span class="text-medical-accent font-bold tracking-widest uppercase text-sm">Empirical Research & Benchmark</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-white mt-2">Clinical Architecture & Benchmarking</h2>
+                <p class="text-sm text-gray-400 mt-2 max-w-xl mx-auto">Evaluating state-of-the-art predictive algorithms for Chronic Kidney Disease</p>
+            </div>
+
+            <!-- 3D Kidney Diagram Showcase Card -->
+            <div class="relative h-[480px] bg-gradient-to-br from-slate-950 via-[#0B1628] to-[#050D1A] rounded-3xl border border-cyan-500/20 shadow-2xl overflow-hidden flex items-center justify-center mb-12">
+                <!-- Glowing clinical grid background -->
+                <div class="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.04)_1px,transparent_1px)] bg-[size:30px_30px] opacity-40"></div>
+                <!-- Radial background glow -->
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-80 h-80 rounded-full bg-cyan-500/10 filter blur-[80px]"></div>
+                </div>
+                <!-- 3D Kidney Anatomical Image with white inverted labels -->
+                <img
+                    src="kidney3d.png"
+                    alt="3D Anatomical Kidney Diagram"
+                    class="relative z-10 h-[85%] object-contain drop-shadow-[0_0_55px_rgba(6,182,212,0.25)] transition-transform duration-500 hover:scale-[1.03]"
+                    style="filter: invert(1) hue-rotate(180deg);"
+                />
+            </div>
+
+            <!-- Subsection 1: System Architecture SVG -->
+            <div class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-cyan-500/20 p-8 mb-12">
+                <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-medical-accent animate-pulse"></span>
+                    End-to-End Clinical Predictive Pipeline
+                </h3>
+                <div class="w-full overflow-x-auto py-4">
+                    <svg viewBox="0 0 1000 220" class="w-full min-w-[900px] h-auto">
+                        <defs>
+                            <linearGradient id="cyan-blue" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#06B6D4" />
+                                <stop offset="100%" stop-color="#3B82F6" />
+                            </linearGradient>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#06B6D4" />
+                            </marker>
+                        </defs>
+                        <g transform="translate(10, 80)">
+                            <rect width="90" height="60" rx="10" fill="#1E293B" stroke="#06B6D4" stroke-width="1.5" />
+                            <text x="45" y="35" fill="#F0F4F8" font-size="10" font-weight="bold" text-anchor="middle">Raw Data</text>
+                            <text x="45" y="48" fill="#8899AA" font-size="8" text-anchor="middle">400 Patients</text>
+                        </g>
+                        <line x1="100" y1="110" x2="135" y2="110" stroke="#06B6D4" stroke-width="2" marker-end="url(#arrow)" />
+                        
+                        <g transform="translate(140, 80)">
+                            <rect width="105" height="60" rx="10" fill="#1E293B" stroke="#06B6D4" stroke-width="1.5" />
+                            <text x="52" y="28" fill="#F0F4F8" font-size="10" font-weight="bold" text-anchor="middle">Stratified Split</text>
+                            <text x="52" y="42" fill="#06B6D4" font-size="8" font-weight="bold" text-anchor="middle">Train/Test 80:20</text>
+                            <text x="52" y="52" fill="#8899AA" font-size="7" text-anchor="middle">No Leakage Enforced</text>
+                        </g>
+                        <line x1="245" y1="110" x2="280" y2="110" stroke="#06B6D4" stroke-width="2" marker-end="url(#arrow)" />
+
+                        <g transform="translate(285, 80)">
+                            <rect width="100" height="60" rx="10" fill="#1E293B" stroke="#06B6D4" stroke-width="1.5" />
+                            <text x="50" y="28" fill="#F0F4F8" font-size="10" font-weight="bold" text-anchor="middle">SMOTE Engine</text>
+                            <text x="50" y="42" fill="#EF4444" font-size="8" font-weight="bold" text-anchor="middle">1000:1000 Balanced</text>
+                            <text x="50" y="52" fill="#8899AA" font-size="7" text-anchor="middle">Train Only</text>
+                        </g>
+                        <path d="M 385 110 L 410 110 L 410 50 L 440 50" fill="none" stroke="#06B6D4" stroke-width="1.5" marker-end="url(#arrow)" />
+                        <path d="M 385 110 L 440 110" fill="none" stroke="#06B6D4" stroke-width="1.5" marker-end="url(#arrow)" />
+                        <path d="M 385 110 L 410 110 L 410 170 L 440 170" fill="none" stroke="#06B6D4" stroke-width="1.5" marker-end="url(#arrow)" />
+
+                        <g transform="translate(445, 20)">
+                            <rect width="105" height="50" rx="8" fill="#0F172A" stroke="#3B82F6" stroke-width="1.2" />
+                            <text x="52" y="28" fill="#F0F4F8" font-size="9" font-weight="bold" text-anchor="middle">PCA Compactor</text>
+                            <text x="52" y="40" fill="#8899AA" font-size="8" text-anchor="middle">19 Components</text>
+                        </g>
+                        <g transform="translate(445, 85)">
+                            <rect width="105" height="50" rx="8" fill="#0F172A" stroke="#3B82F6" stroke-width="1.2" />
+                            <text x="52" y="28" fill="#F0F4F8" font-size="9" font-weight="bold" text-anchor="middle">Full Feature Set</text>
+                            <text x="52" y="40" fill="#8899AA" font-size="8" text-anchor="middle">24 Raw Metrics</text>
+                        </g>
+                        <g transform="translate(445, 145)">
+                            <rect width="105" height="50" rx="8" fill="#0F172A" stroke="#3B82F6" stroke-width="1.2" />
+                            <text x="52" y="28" fill="#F0F4F8" font-size="9" font-weight="bold" text-anchor="middle">LDA Projections</text>
+                            <text x="52" y="40" fill="#8899AA" font-size="8" text-anchor="middle">1 Component</text>
+                        </g>
+
+                        <path d="M 550 45 L 580 45 L 580 110 L 600 110" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)" />
+                        <path d="M 550 110 L 600 110" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)" />
+                        <path d="M 550 170 L 580 170 L 580 110 L 600 110" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)" />
+
+                        <g transform="translate(605, 80)">
+                            <rect width="115" height="60" rx="10" fill="#1E293B" stroke="#3B82F6" stroke-width="1.5" />
+                            <text x="57" y="28" fill="#F0F4F8" font-size="10" font-weight="bold" text-anchor="middle">8-Model Evaluator</text>
+                            <text x="57" y="42" fill="#8899AA" font-size="8" text-anchor="middle">Accuracy / AUC / F1</text>
+                            <text x="57" y="52" fill="#3B82F6" font-size="7" font-weight="bold" text-anchor="middle">Stratified 10-Fold CV</text>
+                        </g>
+                        <line x1="720" y1="110" x2="755" y2="110" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrow)" />
+
+                        <g transform="translate(760, 80)">
+                            <rect width="100" height="60" rx="10" fill="#020617" stroke="#06B6D4" stroke-width="2" />
+                            <text x="50" y="28" fill="#06B6D4" font-size="11" font-weight="bold" text-anchor="middle">XGBoost Final</text>
+                            <text x="50" y="42" fill="#F0F4F8" font-size="8" font-weight="bold" text-anchor="middle">Acc: 96.50%</text>
+                            <text x="50" y="52" fill="#8899AA" font-size="7" text-anchor="middle">SHAP Explainable</text>
+                        </g>
+                        <line x1="860" y1="110" x2="895" y2="110" stroke="#06B6D4" stroke-width="2" marker-end="url(#arrow)" />
+
+                        <g transform="translate(900, 80)">
+                            <rect width="90" height="60" rx="10" fill="#1E293B" stroke="#06B6D4" stroke-width="1.5" />
+                            <text x="45" y="28" fill="#F0F4F8" font-size="10" font-weight="bold" text-anchor="middle">NephroAI</text>
+                            <text x="45" y="42" fill="#06B6D4" font-size="8" font-weight="bold" text-anchor="middle">Live Platform</text>
+                            <text x="45" y="52" fill="#8899AA" font-size="7" text-anchor="middle">Physician Portal</text>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Subsection 2: Model Comparison Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                <div class="lg:col-span-2 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-cyan-500/20 p-6 flex flex-col h-[400px]">
+                    <h3 class="text-lg font-bold text-white mb-4">Multi-Model Performance Comparison</h3>
+                    <div class="flex-1 min-h-0 relative w-full h-full">
+                        <canvas id="comparisonChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col gap-6">
+                    <div class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-cyan-500/20 p-6 flex-1">
+                        <h4 class="text-sm font-bold text-medical-accent uppercase tracking-wider mb-2">PCA (Principal Component Analysis)</h4>
+                        <p class="text-xs text-gray-400 mb-3">Unsupervised compression of the 24 inputs down to 19 orthogonal dimensions while retaining 95% variance. Ignores diagnostic labels.</p>
+                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                            <span class="text-xs text-gray-500 block uppercase font-semibold">Components Used</span>
+                            <span class="text-lg font-extrabold text-white">19 Components <span class="text-xs text-medical-accent">(95% Variance)</span></span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-cyan-500/20 p-6 flex-1">
+                        <h4 class="text-sm font-bold text-medical-accent uppercase tracking-wider mb-2">LDA (Linear Discriminant Analysis)</h4>
+                        <p class="text-xs text-gray-400 mb-3">Supervised dimension reduction projecting the 24 features into a single axis optimized to maximize separation between CKD and Healthy classes.</p>
+                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                            <span class="text-xs text-gray-500 block uppercase font-semibold">Projections Generated</span>
+                            <span class="text-lg font-extrabold text-white">1 Dimension <span class="text-xs text-medical-accent">(Supervised Axis)</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subsection 3: Algorithm Cards (CSS 3D Flip) -->
+            <h3 class="text-xl font-bold text-white mt-12 mb-6 text-center">8-Model Comparative Metrics & Workings</h3>
+            <div class="flip-grid">
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front border-cyan-500">
+                            <span class="text-xs font-extrabold text-medical-accent uppercase tracking-wider">XGBoost ★</span>
+                            <span class="flip-card-metric text-medical-accent">96.50%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>XGBoost Classifier</h4>
+                            <p>Gradient Boosting framework utilizing decision trees. It trains subsequent estimators to correct errors of existing ones, featuring regularization parameters to mitigate overfitting. Final selected model.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Logistic Regression</span>
+                            <span class="flip-card-metric">96.75%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>Logistic Regression</h4>
+                            <p>Linear model calculating probabilities using the logistic sigmoid function. Exceptional performance due to highly linear separation in scaled space, though weak to complex categorical cross-interactions.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">SVM (RBF)</span>
+                            <span class="flip-card-metric">96.50%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>Support Vector Machine</h4>
+                            <p>Support Vector Classifier utilizing the Radial Basis Function kernel. Maximizes decision boundary margins, yielding solid clinical classifications.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Gradient Boosting</span>
+                            <span class="flip-card-metric">96.00%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>Gradient Boosting</h4>
+                            <p>Ensemble technique building sequential decision trees to minimize overall loss functions via gradient descent. High generalization capability but lacks XGBoost speed optimizations.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Random Forest</span>
+                            <span class="flip-card-metric">95.00%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>Random Forest</h4>
+                            <p>Bagging ensemble algorithm training hundreds of independent decision trees on bootstrap datasets. Aggregates predictions to reduce variance, but prone to higher latency.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">KNN</span>
+                            <span class="flip-card-metric">91.75%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>K-Nearest Neighbors</h4>
+                            <p>Distance-based classifier classifying patients based on proximity to nearest records in multi-dimensional feature space. Heavily reliant on feature scaling quality.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Naive Bayes</span>
+                            <span class="flip-card-metric">88.25%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>Gaussian Naive Bayes</h4>
+                            <p>Probabilistic classifier based on Bayes' Theorem, naively assuming complete independence between all 24 biomarkers. Lower accuracy due to heavy cross-dependence of renal indicators.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Decision Tree</span>
+                            <span class="flip-card-metric">91.25%</span>
+                            <span class="text-xs text-gray-500">Test Accuracy</span>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>Decision Tree</h4>
+                            <p>Builds a flowchart-like split structure using Gini impurity or Information Gain. Simple to trace, but extremely prone to overfitting and noise in dense numerical spaces.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subsection 4: Why XGBoost Spotlight -->
+            <div class="xgboost-spotlight">
+                <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-medical-accent animate-ping"></span>
+                    Why XGBoost Outperforms in Clinical Diagnostics
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-slate-955 p-4 rounded-xl border border-cyan-500/10">
+                        <span class="text-2xl text-medical-accent block mb-2 font-bold">01</span>
+                        <h4 class="text-sm font-bold text-white mb-2">Captures Non-Linear Dynamics</h4>
+                        <p class="text-xs text-gray-400">Renal failure biomarkers involve non-linear dependencies. Trees split dynamically to handle complex thresholds.</p>
+                    </div>
+                    <div class="bg-slate-955 p-4 rounded-xl border border-cyan-500/10">
+                        <span class="text-2xl text-medical-accent block mb-2 font-bold">02</span>
+                        <h4 class="text-sm font-bold text-white mb-2">Integrated Regularization</h4>
+                        <p class="text-xs text-gray-400">Enforces L1 (Lasso) and L2 (Ridge) penalties inside the objective function to minimize overfitting on clinical outliers.</p>
+                    </div>
+                    <div class="bg-slate-955 p-4 rounded-xl border border-cyan-500/10">
+                        <span class="text-2xl text-medical-accent block mb-2 font-bold">03</span>
+                        <h4 class="text-sm font-bold text-white mb-2">Optimal Sensitivity</h4>
+                        <p class="text-xs text-gray-400">Achieves 98.3% sensitivity, ensuring near-zero false negatives. Vital in medical screening where missing a diagnosis is critical.</p>
+                    </div>
+                    <div class="bg-slate-955 p-4 rounded-xl border border-cyan-500/10">
+                        <span class="text-2xl text-medical-accent block mb-2 font-bold">04</span>
+                        <h4 class="text-sm font-bold text-white mb-2">SHAP Explainer Native</h4>
+                        <p class="text-xs text-gray-400">Optimized for tree ensembles, permitting instantaneous calculation of Shapley values for transparent, patient-level explanations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-8 text-center">
+        <p class="text-medical-primary font-bold text-lg mb-2">Nephro<span class="text-medical-accent">AI</span></p>
+        <p class="text-sm text-medical-secondary">Final Year Research Project • SOA University</p>
+    </footer>
+
+    <!-- History Sidebar Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <!-- History Sidebar -->
+    <div id="history-sidebar" class="history-sidebar">
+        <div class="history-header">
+            <h3 class="history-title">Patient Diagnostic History</h3>
+            <button id="btn-history-close" class="history-close">&times;</button>
+        </div>
+        <div id="history-list-container" class="history-list">
+            <!-- Loaded via JS -->
+        </div>
+        <div class="p-4 border-t border-gray-200 bg-white flex justify-between gap-4 mt-auto">
+            <button id="btn-history-clear" class="flex-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 py-2.5 rounded-lg text-xs font-bold transition-all">Clear All History</button>
+        </div>
+    </div>
+
+    <!-- AI Chatbot Widget (Inside its Container so it can be hidden/shown) -->
+    <div id="chatbot-widget-container" class="chatbot-widget hidden">
+        <button id="chatbot-btn" class="chatbot-btn">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+        </button>
+        <div id="chatbot-panel" class="chatbot-panel">
+            <div class="chatbot-header">
+                <div class="chatbot-avatar">AI</div>
+                <div class="chatbot-header-text">
+                    <h4>NephroAI Copilot</h4>
+                    <p>Ask me about biomarkers or ML models</p>
+                </div>
+                <button id="chatbot-close" class="ml-auto text-medical-secondary hover:text-white bg-transparent border-none text-base cursor-pointer">&times;</button>
+            </div>
+            <div id="chatbot-messages" class="chatbot-messages bg-white">
+                <div class="chat-bubble chat-bubble-bot">
+                    Hello! I'm NephroAI Copilot. Ask me about CKD stages, biomarkers like creatinine or hemoglobin, or how we trained our XGBoost model.
+                </div>
+            </div>
+            <div class="chatbot-input-container">
+                <input type="text" id="chatbot-input" placeholder="Type a clinical question..." class="chatbot-input" />
+                <button id="chatbot-send-btn" class="chatbot-send-btn">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dynamic Script Block -->
+    <script>
+        // Form Data Definitions
+        const FEATURES = [
+            { id:'age',  label:'Age (years)', type:'num', default:48, section:'num' },
+            { id:'bp',   label:'Blood Pressure (mm Hg)', type:'num', default:80, section:'num' },
+            { id:'bgr',  label:'Blood Glucose Random', type:'num', default:121, section:'num' },
+            { id:'bu',   label:'Blood Urea', type:'num', default:36, section:'num' },
+            { id:'sc',   label:'Serum Creatinine', type:'num', default:1.2, section:'num' },
+            { id:'sod',  label:'Sodium (mEq/L)', type:'num', default:138, section:'num' },
+            { id:'pot',  label:'Potassium (mEq/L)', type:'num', default:4.4, section:'num' },
+            { id:'hemo', label:'Hemoglobin (g/dL)', type:'num', default:15.4, section:'num' },
+            { id:'pcv',  label:'Packed Cell Vol. (%)', type:'num', default:44, section:'num' },
+            { id:'wc',   label:'WBC Count (cells/µL)', type:'num', default:7800, section:'num' },
+            { id:'rc',   label:'RBC Count (millions/µL)', type:'num', default:5.2, section:'num' },
+            { id:'al',   label:'Albumin (0-5)', type:'num', default:0, section:'num' },
+            { id:'su',   label:'Sugar (0-5)', type:'num', default:0, section:'num' },
+            { id:'sg',   label:'Specific Gravity', type:'num', default:1.020, section:'num' },
+            { id:'rbc',  label:'Red Blood Cells', type:'cat', opts:[{v:1,l:'Normal'},{v:0,l:'Abnormal'}], default:1, section:'cat' },
+            { id:'pc',   label:'Pus Cell', type:'cat', opts:[{v:1,l:'Normal'},{v:0,l:'Abnormal'}], default:1, section:'cat' },
+            { id:'pcc',  label:'Pus Cell Clumps', type:'cat', opts:[{v:0,l:'Not Present'},{v:1,l:'Present'}], default:0, section:'cat' },
+            { id:'ba',   label:'Bacteria', type:'cat', opts:[{v:0,l:'Not Present'},{v:1,l:'Present'}], default:0, section:'cat' },
+            { id:'htn',  label:'Hypertension', type:'cat', opts:[{v:0,l:'No'},{v:1,l:'Yes'}], default:0, section:'cat' },
+            { id:'dm',   label:'Diabetes Mellitus', type:'cat', opts:[{v:0,l:'No'},{v:1,l:'Yes'}], default:0, section:'cat' },
+            { id:'cad',  label:'Coronary Artery Disease', type:'cat', opts:[{v:0,l:'No'},{v:1,l:'Yes'}], default:0, section:'cat' },
+            { id:'appet',label:'Appetite', type:'cat', opts:[{v:0,l:'Good'},{v:1,l:'Poor'}], default:0, section:'cat' },
+            { id:'pe',   label:'Pedal Edema', type:'cat', opts:[{v:0,l:'No'},{v:1,l:'Yes'}], default:0, section:'cat' },
+            { id:'ane',  label:'Anemia', type:'cat', opts:[{v:0,l:'No'},{v:1,l:'Yes'}], default:0, section:'cat' },
+        ];
+
+        // Generate input fields dynamically
+        const numGrid = document.getElementById('form-num-grid');
+        const catGrid = document.getElementById('form-cat-grid');
+        
+        const createInputClass = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-accent focus:ring focus:ring-cyan-200 focus:ring-opacity-50 text-sm py-2 px-3 border bg-white text-medical-primary";
+        const createLabelClass = "block text-xs font-semibold text-medical-secondary";
+
+        FEATURES.forEach(f => {
+            const wrapper = document.createElement('div');
+            const label = document.createElement('label');
+            label.className = createLabelClass;
+            label.htmlFor = f.id;
+            label.textContent = f.label;
+            wrapper.appendChild(label);
+
+            if (f.type === 'num') {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.step = 'any';
+                input.id = f.id;
+                input.value = f.default;
+                input.required = true;
+                input.className = createInputClass;
+                wrapper.appendChild(input);
+                numGrid.appendChild(wrapper);
+            } else {
+                const select = document.createElement('select');
+                select.id = f.id;
+                select.className = createInputClass;
+                f.opts.forEach(o => {
+                    const option = document.createElement('option');
+                    option.value = o.v;
+                    option.textContent = o.l;
+                    if (o.v === f.default) option.selected = true;
+                    select.appendChild(option);
+                });
+                wrapper.appendChild(select);
+                catGrid.appendChild(wrapper);
+            }
+        });
+
+        // Gauge Canvas Drawer
+        function drawGauge(prob, color) {
+            const canvas = document.getElementById('gaugeCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0,0,w,h);
+            const cx = w/2, cy = h/2;
+            const r = (w/2) - 10;
+            
+            // BG arc
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, Math.PI, 2*Math.PI);
+            ctx.strokeStyle = '#F1F5F9';
+            ctx.lineWidth = 14;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            // Fill arc
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, Math.PI, Math.PI + (prob * Math.PI));
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 14;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        // Patient Prediction Form Submission
+        let shapChartInstance = null;
+        function renderShapChart(shapData) {
+            const ctx = document.getElementById('shapChart');
+            if (shapChartInstance) shapChartInstance.destroy();
+            const labels = shapData.map(d => d.feature.toUpperCase());
+            const values = shapData.map(d => d.value);
+            const colors = values.map(v => v > 0 ? '#EF4444' : '#06B6D4');
+            
+            shapChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderRadius: 4,
+                        barThickness: 'flex'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#F1F5F9' }, ticks: { color: '#64748B', font: {size:10} } },
+                        y: { grid: { display: false }, ticks: { color: '#0F172A', font: {size:11, weight:'bold'} } }
+                    }
+                }
+            });
+        }
+
+        const form = document.getElementById('ckd-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btnText = document.getElementById('btn-text');
+            const btnLoader = document.getElementById('btn-loader');
+            
+            btnText.textContent = 'Processing...';
+            btnLoader.classList.remove('hidden');
+            document.getElementById('result-placeholder').classList.add('hidden');
+            const ra = document.getElementById('result-active');
+            ra.classList.add('hidden');
+            ra.classList.remove('result-active-show');
+
+            const payload = {};
+            const historyPayload = {};
+            FEATURES.forEach(f => {
+                const val = parseFloat(document.getElementById(f.id).value);
+                payload[f.id] = val;
+                historyPayload[f.id] = val;
+            });
+
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                const prob = data.probability;
+                const pred = data.prediction;
+                
+                document.getElementById('gauge-pct').textContent = (prob * 100).toFixed(1) + '%';
+                const color = pred === 1 ? '#EF4444' : '#10B981';
+                drawGauge(prob, color);
+
+                const badge = document.getElementById('verdict-badge');
+                const rec = document.getElementById('recommendation');
+                if (pred === 1) {
+                    badge.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-red-50 text-medical-red border-red-200';
+                    badge.textContent = 'High Risk (CKD)';
+                    rec.className = 'text-sm text-medical-secondary bg-red-50 p-4 rounded-xl border-l-4 border-medical-red';
+                    rec.innerHTML = '<strong>Clinical Alert:</strong> High probability of CKD detected. Recommend comprehensive metabolic panel and nephrology referral.';
+                } else {
+                    badge.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-green-50 text-medical-green border-green-200';
+                    badge.textContent = 'Low Risk (Healthy)';
+                    rec.className = 'text-sm text-medical-secondary bg-green-50 p-4 rounded-xl border-l-4 border-medical-green';
+                    rec.innerHTML = '<strong>Assessment Normal:</strong> Biomarkers are within normal ranges. Continue standard annual screening protocol.';
+                }
+
+                ra.classList.remove('hidden');
+                ra.classList.add('result-active-show');
+                
+                setTimeout(() => renderShapChart(data.shap_values), 80);
+
+                // Setup Save to History
+                const saveBtn = document.getElementById('btn-save-history');
+                if (saveBtn) {
+                    saveBtn.classList.remove('hidden');
+                    const newSaveBtn = saveBtn.cloneNode(true);
+                    saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+                    newSaveBtn.classList.remove('hidden');
+                    newSaveBtn.addEventListener('click', () => {
+                        const nameInput = document.getElementById('patient-name-input');
+                        const name = nameInput ? nameInput.value.trim() : '';
+                        saveHistoryItem(name, historyPayload, prob, pred);
+                        alert('Diagnostic report successfully logged to local history.');
+                        newSaveBtn.classList.add('hidden');
+                        if (nameInput) nameInput.value = '';
+                    });
+                }
+
+            } catch (err) {
+                alert('Error: ' + err.message + '\nMake sure the Flask server is running at http://127.0.0.1:5000');
+                document.getElementById('result-placeholder').classList.remove('hidden');
+            } finally {
+                btnText.textContent = 'Run Diagnostic Analysis';
+                btnLoader.classList.add('hidden');
+            }
+        });
+
+        // Original Analytics Benchmark Chart (Clinical View)
+        const ctxModels = document.getElementById('modelChart');
+        if (ctxModels) {
+            new Chart(ctxModels, {
+                type: 'bar',
+                data: {
+                    labels: ['LR', 'SVM', 'GB', 'XGB', 'RF', 'KNN', 'NB', 'DT'],
+                    datasets: [{
+                        data: [0.9969, 0.9942, 0.9909, 0.9913, 0.9866, 0.9765, 0.9591, 0.9313],
+                        backgroundColor: ['#3B82F6', '#3B82F6', '#3B82F6', '#06B6D4', '#3B82F6', '#3B82F6', '#3B82F6', '#3B82F6'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            min: 0.9, 
+                            max: 1.0, 
+                            grid: { color: '#F1F5F9' },
+                            ticks: { color: '#475569', font: { weight: 'bold' } }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { color: '#475569', font: { weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Original parallax on kidney image
+        (function() {
+            const img = document.getElementById('kidney-img');
+            if (!img) return;
+            document.addEventListener('mousemove', (e) => {
+                const mx = (e.clientX / window.innerWidth - 0.5) * 12;
+                const my = (e.clientY / window.innerHeight - 0.5) * 8;
+                img.style.transform = `translate(${mx}px, ${my}px) scale(1.02)`;
+            });
+        })();
+
+        // ─── NAVBAR PORTAL / HUB TAB SWITCHER ───
+        const btnClinical = document.getElementById('nav-btn-clinical');
+        const btnResearch = document.getElementById('nav-btn-research');
+        const clinicalViews = document.querySelectorAll('.clinical-view');
+        const researchViews = document.querySelectorAll('.research-view');
+
+        function showClinical() {
+            clinicalViews.forEach(el => el.classList.remove('hidden'));
+            researchViews.forEach(el => el.classList.add('hidden'));
+            btnClinical.className = "text-medical-accent font-semibold transition-colors border-b-2 border-medical-accent pb-1 focus:outline-none";
+            btnResearch.className = "text-medical-secondary hover:text-medical-accent font-medium transition-colors pb-1 focus:outline-none";
+            
+            // Hide chatbot widget when not in research
+            const chatbot = document.getElementById('chatbot-widget-container');
+            if (chatbot) chatbot.classList.add('hidden');
+        }
+
+        function showResearch() {
+            clinicalViews.forEach(el => el.classList.add('hidden'));
+            researchViews.forEach(el => el.classList.remove('hidden'));
+            btnResearch.className = "text-medical-accent font-semibold transition-colors border-b-2 border-medical-accent pb-1 focus:outline-none";
+            btnClinical.className = "text-medical-secondary hover:text-medical-accent font-medium transition-colors pb-1 focus:outline-none";
+            
+            // Show chatbot widget in research
+            const chatbot = document.getElementById('chatbot-widget-container');
+            if (chatbot) chatbot.classList.remove('hidden');
+            
+            // Re-trigger layout sizes for canvases
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        if (btnClinical && btnResearch) {
+            btnClinical.addEventListener('click', (e) => { e.preventDefault(); showClinical(); });
+            btnResearch.addEventListener('click', (e) => { e.preventDefault(); showResearch(); });
+        }
+
+        // ─── DIAGNOSTIC MANUAL VS OCR TAB CONTROL ───
+        const tabManual = document.getElementById('tab-manual-entry');
+        const tabOCR = document.getElementById('tab-upload-report');
+        const manualContainer = document.getElementById('manual-form-container');
+        const ocrContainer = document.getElementById('ocr-upload-container');
+
+        if (tabManual && tabOCR && manualContainer && ocrContainer) {
+            tabManual.addEventListener('click', () => {
+                tabManual.className = "flex-1 py-3 text-sm font-semibold text-medical-accent border-b-2 border-medical-accent bg-white focus:outline-none";
+                tabOCR.className = "flex-1 py-3 text-sm font-semibold text-medical-secondary hover:text-medical-primary transition-colors border-b-2 border-transparent focus:outline-none";
+                manualContainer.classList.remove('hidden');
+                ocrContainer.classList.add('hidden');
+            });
+
+            tabOCR.addEventListener('click', () => {
+                tabOCR.className = "flex-1 py-3 text-sm font-semibold text-medical-accent border-b-2 border-medical-accent bg-white focus:outline-none";
+                tabManual.className = "flex-1 py-3 text-sm font-semibold text-medical-secondary hover:text-medical-primary transition-colors border-b-2 border-transparent focus:outline-none";
+                manualContainer.classList.add('hidden');
+                ocrContainer.classList.remove('hidden');
+            });
+        }
+
+        // ─── PRESET LOADERS ENGINE ───
+        const PRESETS = {
+            healthy: {
+                age: 35, bp: 70, sg: 1.025, al: 0, su: 0, bgr: 90, bu: 20, sc: 0.8,
+                sod: 140, pot: 4.0, hemo: 15.5, pcv: 46, wc: 8000, rc: 5.4,
+                rbc: 1, pc: 1, pcc: 0, ba: 0, htn: 0, dm: 0, cad: 0, appet: 0, pe: 0, ane: 0
+            },
+            ckd: {
+                age: 68, bp: 90, sg: 1.010, al: 4, su: 3, bgr: 200, bu: 80, sc: 7.2,
+                sod: 130, pot: 5.5, hemo: 8.5, pcv: 24, wc: 9800, rc: 2.8,
+                rbc: 0, pc: 0, pcc: 1, ba: 1, htn: 1, dm: 1, cad: 1, appet: 1, pe: 1, ane: 1
+            }
+        };
+
+        function loadPreset(type) {
+            const patient = PRESETS[type];
+            if (!patient) return;
+            Object.keys(patient).forEach(key => {
+                const el = document.getElementById(key);
+                if (el) el.value = patient[key];
+            });
+        }
+
+        const btnPresetHealthy = document.getElementById('btn-preset-healthy');
+        const btnPresetCKD = document.getElementById('btn-preset-ckd');
+        if (btnPresetHealthy) btnPresetHealthy.addEventListener('click', () => loadPreset('healthy'));
+        if (btnPresetCKD) btnPresetCKD.addEventListener('click', () => loadPreset('ckd'));
+
+        // ─── OCR SCANNING & REGEX PARSING ───
+        const dropzone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('ocr-file-input');
+
+        if (dropzone && fileInput) {
+            dropzone.addEventListener('click', () => fileInput.click());
+            
+            ['dragenter', 'dragover'].forEach(name => {
+                dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add('bg-cyan-50/20'); });
+            });
+            ['dragleave', 'drop'].forEach(name => {
+                dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove('bg-cyan-50/20'); });
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                if (dt.files.length > 0) runOCR(dt.files[0]);
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) runOCR(fileInput.files[0]);
+            });
+        }
+
+        async function runOCR(file) {
+            const progressContainer = document.getElementById('ocr-status');
+            const progressFill = document.getElementById('ocr-progress');
+            const progressText = document.getElementById('ocr-progress-text');
+            if (!progressContainer || !progressFill || !progressText) return;
+
+            progressContainer.classList.remove('hidden');
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Preprocessing image...';
+
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                worker.logger = (msg) => {
+                    if (msg.status === 'recognizing text') {
+                        const percent = Math.round(msg.progress * 100);
+                        progressFill.style.width = percent + '%';
+                        progressText.textContent = `Analyzing biomarkers... (${percent}%)`;
+                    }
+                };
+
+                const res = await worker.recognize(file);
+                const text = res.data.text;
+                await worker.terminate();
+
+                parseLabReportText(text);
+
+                progressText.textContent = '✓ Scanning Complete!';
+                progressFill.style.width = '100%';
+                setTimeout(() => progressContainer.classList.add('hidden'), 1500);
+
+            } catch (err) {
+                console.error(err);
+                progressText.textContent = '⚠ Scanning failed.';
+                alert('OCR engine failed to recognize document.');
+            }
+        }
+
+        function parseLabReportText(text) {
+            const rules = [
+                { id: 'age', regex: /(?:age|years?)[:\s]+(\d+)/i },
+                { id: 'bp', regex: /(?:bp|blood\s+pressure|sys\/dia)[:\s]+(\d+)/i },
+                { id: 'bgr', regex: /(?:bgr|glucose|random\s+glucose|blood\s+sugar)[:\s]+(\d+)/i },
+                { id: 'bu', regex: /(?:bu|urea|blood\s+urea)[:\s]+(\d+)/i },
+                { id: 'sc', regex: /(?:sc|creatinine|serum\s+creatinine)[:\s]+([\d.]+)/i },
+                { id: 'sod', regex: /(?:sod|sodium)[:\s]+(\d+)/i },
+                { id: 'pot', regex: /(?:pot|potassium)[:\s]+([\d.]+)/i },
+                { id: 'hemo', regex: /(?:hemo|hemoglobin|hb)[:\s]+([\d.]+)/i },
+                { id: 'pcv', regex: /(?:pcv|packed\s+cell|haematocrit)[:\s]+(\d+)/i },
+                { id: 'wc', regex: /(?:wc|wbc|white\s+blood\s+count)[:\s]+(\d+)/i },
+                { id: 'rc', regex: /(?:rc|rbc|red\s+blood\s+count)[:\s]+([\d.]+)/i },
+                { id: 'al', regex: /(?:al|albumin)[:\s]+(\d)/i },
+                { id: 'su', regex: /(?:su|sugar)[:\s]+(\d)/i },
+                { id: 'sg', regex: /(?:sg|specific\s+gravity)[:\s]+([\d.]+)/i }
+            ];
+
+            let counts = 0;
+            rules.forEach(rule => {
+                const match = text.match(rule.regex);
+                if (match && match[1]) {
+                    const el = document.getElementById(rule.id);
+                    if (el) {
+                        el.value = parseFloat(match[1]);
+                        counts++;
+                        el.classList.add('border-cyan-500', 'ring-2', 'ring-cyan-200');
+                        setTimeout(() => el.classList.remove('border-cyan-500', 'ring-2', 'ring-cyan-200'), 2000);
+                    }
+                }
+            });
+
+            if (counts > 0) {
+                alert(`Extracted and filled ${counts} clinical biomarkers! Please review highlighted fields.`);
+            } else {
+                alert('No recognizable biomarkers found in document scan.');
+            }
+        }
+
+        // ─── PATIENT HISTORY (LOCALSTORAGE) ───
+        const STORAGE_KEY = 'nephroai_history';
+        function getHistoryItems() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        function saveHistoryItem(name, inputs, prob, pred) {
+            const history = getHistoryItems();
+            const record = {
+                id: Date.now(),
+                name: name || `Patient #${history.length + 1}`,
+                date: new Date().toLocaleString(),
+                inputs,
+                probability: prob,
+                prediction: pred
+            };
+            history.unshift(record);
+            if (history.length > 30) history.pop();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+            renderHistoryItems();
+        }
+
+        function deleteHistoryItem(id, e) {
+            if (e) e.stopPropagation();
+            let history = getHistoryItems();
+            history = history.filter(item => item.id !== id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+            renderHistoryItems();
+        }
+
+        function clearAllHistory() {
+            if (confirm('Clear entire patient history list?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                renderHistoryItems();
+            }
+        }
+
+        function loadPatientHistory(id) {
+            const history = getHistoryItems();
+            const item = history.find(i => i.id === id);
+            if (!item) return;
+
+            Object.keys(item.inputs).forEach(key => {
+                const el = document.getElementById(key);
+                if (el) el.value = item.inputs[key];
+            });
+
+            const nameInput = document.getElementById('patient-name-input');
+            if (nameInput) nameInput.value = item.name;
+
+            alert(`Loaded biomarker parameters for patient "${item.name}".`);
+            closeHistorySidebar();
+        }
+
+        function renderHistoryItems() {
+            const container = document.getElementById('history-list-container');
+            if (!container) return;
+
+            const history = getHistoryItems();
+            if (history.length === 0) {
+                container.innerHTML = `<p class="text-center text-xs text-gray-400 py-12">No patient diagnostics saved yet.</p>`;
+                return;
+            }
+
+            container.innerHTML = history.map(item => {
+                const isRisk = item.prediction === 1;
+                const badge = isRisk ? 'history-badge danger' : 'history-badge safe';
+                const label = isRisk ? 'CKD Risk' : 'Healthy';
+                const pct = (item.probability * 100).toFixed(1) + '%';
+                return `
+                    <div class="history-card" onclick="loadPatientHistory(${item.id})">
+                        <div class="history-card-header">
+                            <span class="history-patient-name text-medical-primary">${item.name}</span>
+                            <span class="${badge}">${label} (${pct})</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] text-medical-secondary mt-2">
+                            <span>${item.date}</span>
+                            <button onclick="deleteHistoryItem(${item.id}, event)" class="hover:text-red-500 font-semibold bg-transparent border-none cursor-pointer focus:outline-none">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        const sidebar = document.getElementById('history-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const openHistory = document.getElementById('btn-history-open');
+        const closeHistory = document.getElementById('btn-history-close');
+        const clearHistory = document.getElementById('btn-history-clear');
+
+        function openHistorySidebar() {
+            sidebar.classList.add('open');
+            overlay.classList.add('active');
+            renderHistoryItems();
+        }
+        function closeHistorySidebar() {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        if (openHistory) openHistory.addEventListener('click', openHistorySidebar);
+        if (closeHistory) closeHistory.addEventListener('click', closeHistorySidebar);
+        if (overlay) overlay.addEventListener('click', closeHistorySidebar);
+        if (clearHistory) clearHistory.addEventListener('click', clearAllHistory);
+
+        // ─── THREE.JS 3D KIDNEY DIAGRAM REMOVED (REPLACED BY STATIC ANATOMICAL SHOWCASE) ───
+
+        // ─── THREE.JS PARTICLE FIELD ───
+        let particleRenderer = null;
+        function initResearchParticles() {
+            const canvas = document.getElementById('research-particles-canvas');
+            if (!canvas) return;
+
+            const parent = canvas.parentElement;
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(parent.clientWidth, parent.clientHeight);
+            particleRenderer = renderer;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, parent.clientWidth / parent.clientHeight, 0.1, 100);
+            camera.position.z = 20;
+
+            const pCount = 200;
+            const geom = new THREE.BufferGeometry();
+            const positions = new Float32Array(pCount * 3);
+            const vels = [];
+
+            for (let i = 0; i < pCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 40;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 25;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+
+                vels.push({
+                    x: (Math.random() - 0.5) * 0.02,
+                    y: (Math.random() - 0.5) * 0.02,
+                    z: (Math.random() - 0.5) * 0.02
+                });
+            }
+
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const particles = new THREE.Points(geom, new THREE.PointsMaterial({
+                size: 0.15,
+                color: 0x06B6D4,
+                transparent: true,
+                opacity: 0.4,
+                sizeAttenuation: true
+            }));
+            scene.add(particles);
+
+            let mouseX = 0, mouseY = 0;
+            parent.addEventListener('mousemove', (e) => {
+                const rect = parent.getBoundingClientRect();
+                mouseX = ((e.clientX - rect.left) / parent.clientWidth - 0.5) * 3;
+                mouseY = -((e.clientY - rect.top) / parent.clientHeight - 0.5) * 3;
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const pos = geom.attributes.position.array;
+                for (let i = 0; i < pCount; i++) {
+                    pos[i * 3] += vels[i].x;
+                    pos[i * 3 + 1] += vels[i].y;
+                    pos[i * 3 + 2] += vels[i].z;
+
+                    if (Math.abs(pos[i * 3]) > 20) pos[i * 3] = -pos[i * 3];
+                    if (Math.abs(pos[i * 3 + 1]) > 13) pos[i * 3 + 1] = -pos[i * 3 + 1];
+                    if (Math.abs(pos[i * 3 + 2]) > 10) pos[i * 3 + 2] = -pos[i * 3 + 2];
+                }
+                geom.attributes.position.needsUpdate = true;
+
+                particles.rotation.y += (mouseX * 0.01 - particles.rotation.y) * 0.05;
+                particles.rotation.x += (mouseY * 0.01 - particles.rotation.x) * 0.05;
+
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = parent.clientWidth / parent.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(parent.clientWidth, parent.clientHeight);
+            });
+        }
+
+        // ─── RESEARCH COMPARATIVE CHART ───
+        let comparisonChartInstance = null;
+        function initComparisonChart() {
+            const ctx = document.getElementById('comparisonChart');
+            if (!ctx) return;
+
+            comparisonChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Logistic Reg.', 'Decision Tree', 'Random Forest', 'XGBoost', 'Grad. Boost', 'SVM (RBF)', 'KNN', 'Naive Bayes'],
+                    datasets: [
+                        {
+                            label: 'Test Accuracy (%)',
+                            data: [96.75, 91.25, 95.00, 96.50, 96.00, 96.50, 91.75, 88.25],
+                            backgroundColor: 'rgba(6, 182, 212, 0.4)',
+                            borderColor: '#06B6D4',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'AUC-ROC Score (×100)',
+                            data: [99.69, 93.13, 98.66, 99.13, 99.09, 99.42, 97.65, 95.91],
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            borderColor: '#3B82F6',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'F1 Score (%)',
+                            data: [97.39, 93.01, 96.03, 97.22, 96.81, 97.21, 93.33, 91.05],
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: '#10B981',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#F0F4F8', font: { family: 'Inter', size: 11 } } },
+                        tooltip: { backgroundColor: '#0F172A', titleColor: '#06B6D4', bodyColor: '#F0F4F8' }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#8899AA', font: { size: 10 } } },
+                        y: { min: 80, max: 102, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#8899AA', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // ─── CHATBOT WIDGET ENGINE ───
+        const CHATBOT_RESPONSES = {
+            'ckd': 'Chronic Kidney Disease (CKD) represents the progressive decline of renal function over months or years. The kidneys become unable to filter toxins, leading to waste accumulation in the blood. Early stages are asymptomatic.',
+            'chronic kidney disease': 'Chronic Kidney Disease (CKD) represents the progressive decline of renal function over months or years. The kidneys become unable to filter toxins, leading to waste accumulation in the blood. Early stages are asymptomatic.',
+            'kidney': 'Kidneys are bean-shaped organs in the upper abdomen. They regulate fluids, blood pressure, red blood cell production (via erythropoietin), and filter metabolic waste. Damaged kidneys struggle with all these vital tasks.',
+            'stages': 'CKD is staged 1 to 5 based on GFR (Glomerular Filtration Rate): Stage 1 (>90 eGFR) represents mild kidney damage, whereas Stage 5 (<15 eGFR) represents Kidney Failure (ESRD), requiring dialysis or transplantation.',
+            'prevent': 'To protect kidney health: maintain blood pressure below 130/80 mmHg, regulate blood glucose levels, drink plenty of water (2-3L daily), follow a low-sodium diet, and avoid long-term use of NSAID painkillers.',
+            'diet': 'Renal diets generally require limiting sodium (salt), potassium (found in bananas, potatoes), and phosphorus (found in dairy, nuts) to prevent these waste items from building up to dangerous levels.',
+            'symptoms': 'Early CKD has no symptoms. Advanced stages present with fatigue, loss of appetite, pedal edema (swelling of feet/ankles), short breath, foaming urine, and anemia.',
+            'xgboost': 'XGBoost (Extreme Gradient Boosting) is our final selected model. It trains an ensemble of decision trees sequentially, with each tree correcting errors of the previous ones. It achieved 96.50% test accuracy and 0.9913 AUC-ROC.',
+            'algorithm': 'We benchmarked 8 algorithms: XGBoost, Random Forest, SVM (RBF), Logistic Regression, Gradient Boosting, KNN, Naive Bayes, and Decision Trees. XGBoost was finalized due to optimal generalization and explainability.',
+            'model': 'We benchmarked 8 algorithms: XGBoost, Random Forest, SVM (RBF), Logistic Regression, Gradient Boosting, KNN, Naive Bayes, and Decision Trees. XGBoost was finalized due to optimal generalization and explainability.',
+            'shap': 'SHAP (SHapley Additive exPlanations) is a game-theory approach that determines the exact directional contribution of each biomarker to a patient\'s CKD risk score. It explains the black box of ML.',
+            'explainability': 'Explainability is crucial in clinical AI. Through SHAP, we provide local explanations showing which features increased or decreased a specific patient\'s kidney risk, boosting physician trust.',
+            'accuracy': 'Our final XGBoost classifier achieved 96.50% test accuracy, validated on 400 unseen patients. The cross-validation score was 97.60%, proving robust generalization.',
+            'auc': 'XGBoost achieved an outstanding Area Under the ROC Curve (AUC) of 0.9913, demonstrating strong discrimination performance between healthy individuals and CKD patients.',
+            'f1': 'The F1-score of our XGBoost model stands at 97.22%, showing a perfect balance of sensitivity (minimizing false negatives) and precision (minimizing false positives).',
+            'pca': 'Principal Component Analysis (PCA) was used to compress our 24 biomarkers into 19 principal components, capturing 95% of total variance. This is an unsupervised reduction strategy.',
+            'lda': 'Linear Discriminant Analysis (LDA) is a supervised method that projects our 24 features into a single dimension, maximizing the separation distance between the CKD and Healthy classes.',
+            'smote': 'SMOTE (Synthetic Minority Over-sampling Technique) was used to resolve class imbalance (1,000 CKD cases vs 600 Healthy). We balanced the training dataset to a 1000:1000 split. Crucially, SMOTE was applied ONLY to the training set to prevent data leakage.',
+            'creatinine': 'Serum Creatinine is a waste product of muscle metabolism. Impaired kidneys fail to filter it, causing it to build up. Normal range is 0.7–1.2 mg/dL. Values above 1.5 mg/dL suggest impaired filtration.',
+            'hemoglobin': 'Hemoglobin (Hb) is the oxygen-carrying protein in red blood cells. Healthy kidneys produce erythropoietin (EPO) to stimulate RBC production. CKD causes low EPO, leading to anemia (Hb < 12.0 g/dL).',
+            'specific gravity': 'Specific Gravity measures urine concentration. Normal range is 1.002–1.030. Fixed specific gravity around 1.010 indicates loss of the kidney\'s ability to concentrate urine, a hallmark of CKD.',
+            'blood urea': 'Blood Urea Nitrogen (BUN) is a protein metabolism waste product. Healthy kidneys clear it. Elevated blood urea (>40 mg/dL) points to kidney congestion or dehydration.',
+            'albumin': 'Albumin is a vital protein in the blood. Damaged glomeruli leak albumin into the urine. Albumin scores of 1+ to 5+ in urine tests are highly predictive signs of kidney dysfunction.',
+            'potassium': 'Potassium levels are carefully balanced by the kidneys. Impaired excretion causes hyperkalemia (>5.2 mEq/L), which can cause life-threatening cardiac arrhythmias.',
+            'sodium': 'Sodium is a key electrolyte regulated by kidneys. Damaged kidneys fail to regulate sodium, leading to fluid retention, elevated blood pressure, and swollen feet (pedal edema).',
+            'pcv': 'Packed Cell Volume (PCV) is the percentage of blood volume made of red blood cells. Low PCV (typically below 37%) indicates anemia, commonly caused by kidney failure.',
+            'wbc': 'White Blood Cells (WBC) count. Normal range: 4,000-11,000 cells/µL. Highly elevated WBC count (leukocytosis) indicates a urinary tract or kidney infection.',
+            'rbc': 'Red Blood Cells (RBC) count. Normal range: 4.5-5.9 million/µL. Low RBC counts are characteristic of CKD-induced anemia.',
+            'hypertension': 'Hypertension (HTN) is both a major cause and a direct symptom of CKD. High blood pressure damages kidney arteries, while damaged kidneys fail to control BP due to renin imbalances.',
+            'diabetes': 'Diabetes Mellitus is the leading cause of CKD worldwide. Prolonged high blood sugar damages the fragile filtration units (glomeruli), leading to diabetic nephropathy.',
+            'pedal edema': 'Pedal Edema refers to swelling in the ankles and feet. It happens when impaired kidneys fail to filter sodium and excess fluid, causing fluid to pool in lower extremities.',
+            'anemia': 'Renal anemia is caused by deficiency in erythropoietin production. It is a top predictor of advanced kidney disease, causing extreme fatigue and weakness.',
+            'appetite': 'Loss of appetite (anorexia) or poor taste is common in advanced kidney failure. Uremic toxins accumulate in the bloodstream, leading to nausea, metallic taste, and lack of appetite.',
+            'pus cell': 'Pus cells (white blood cells in urine). Normal is "Not Present". The presence of pus cells ("Abnormal") indicates pyuria, signifying kidney infection or chronic urinary tract inflammation.',
+            'bacteria': 'Urinating bacteria ("Present") suggests an active Urinary Tract Infection (UTI), which if untreated can travel up the ureters and cause severe kidney damage (pyelonephritis).',
+            'help': 'I can assist you with: 1) Clinical CKD biomarkers, 2) The machine learning workflow (XGBoost, SHAP, SMOTE), 3) Model metrics, 4) Form presets and lab report uploads. What would you like to know?',
+            'how to use': '1) Enter patient values in the Biomarkers panel, or use the "Healthy" / "CKD" preset buttons. 2) Click "Run Diagnostic Analysis". 3) Check the risk percentage and SHAP chart. 4) Use "Save to History" to log results.',
+            'presets': 'Presets represent typical patient cases. "Load Healthy Patient" fills normal clinical parameters (e.g. Creatinine 0.8, Hb 15.5). "Load CKD Patient" loads pathological parameters (Creatinine 7.2, Hb 8.5).',
+            'history': 'Patient diagnostics are saved locally using HTML5 localStorage. Click the clock icon in the navbar to open the sidebar, review past tests, load them into the form, or clear history.',
+            'upload': 'Click on "Upload Lab Report" tab above the form. You can drag & drop or click to upload a lab report image (PDF/PNG/JPG). NephroAI uses OCR (Tesseract.js) to extract and auto-fill biomarkers.',
+            'nephroai': 'NephroAI is a clinical decision support system for renal health, built as a senior-year research project at SOA University, utilizing XGBoost, PCA, LDA, and SHAP explainability.',
+            'soa university': 'SOA (Siksha \'O\' Anusandhan) University, Bhubaneswar. This system was designed by Group 11 senior engineering students for the Final Research Project.',
+            'stages of ckd': 'CKD has 5 stages: Stage 1 (eGFR >90, kidney damage with normal function); Stage 2 (eGFR 60-89); Stage 3 (eGFR 30-59); Stage 4 (eGFR 15-29, severe loss); Stage 5 (eGFR <15, kidney failure).'
+        };
+
+        function initChatbotWidget() {
+            const btn = document.getElementById('chatbot-btn');
+            const panel = document.getElementById('chatbot-panel');
+            const closeBtn = document.getElementById('chatbot-close');
+            const input = document.getElementById('chatbot-input');
+            const sendBtn = document.getElementById('chatbot-send-btn');
+            const messagesContainer = document.getElementById('chatbot-messages');
+
+            if (!btn || !panel || !input || !sendBtn || !messagesContainer) return;
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                panel.classList.toggle('open');
+                if (panel.classList.contains('open')) input.focus();
+            });
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    panel.classList.remove('open');
+                });
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!panel.contains(e.target) && !btn.contains(e.target)) {
+                    panel.classList.remove('open');
+                }
+            });
+
+            const send = () => {
+                const text = input.value.trim();
+                if (!text) return;
+
+                const userBubble = document.createElement('div');
+                userBubble.className = 'chat-bubble chat-bubble-user';
+                userBubble.textContent = text;
+                messagesContainer.appendChild(userBubble);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                input.value = '';
+
+                setTimeout(() => {
+                    const cleanText = text.toLowerCase().trim();
+                    let matchedResponse = "I'm not sure about that specific term. Try asking about 'creatinine', 'hemo', 'XGBoost', 'SHAP', 'SMOTE', or 'how to use' the platform.";
+                    
+                    for (const kw of Object.keys(CHATBOT_RESPONSES)) {
+                        if (cleanText.includes(kw)) {
+                            matchedResponse = CHATBOT_RESPONSES[kw];
+                            break;
+                        }
+                    }
+
+                    const botBubble = document.createElement('div');
+                    botBubble.className = 'chat-bubble chat-bubble-bot';
+                    botBubble.textContent = matchedResponse;
+                    messagesContainer.appendChild(botBubble);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }, 600);
+            };
+
+            sendBtn.addEventListener('click', send);
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') send();
+            });
+        }
+
+        // Initialize animations on DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initResearchParticles();
+            initComparisonChart();
+            initChatbotWidget();
+        });
+    </script>
+</body>
+</html>
