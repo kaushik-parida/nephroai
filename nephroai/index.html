@@ -888,6 +888,10 @@
                     </div>
                     
                     <div class="p-5 border-t border-gray-100 bg-gray-50 shrink-0">
+                        <div class="flex items-center gap-2 mb-2 px-1">
+                            <span id="server-status-dot" style="width:8px;height:8px;border-radius:50%;background:#F59E0B;display:inline-block;transition:background 0.4s;" title="Connecting to server..."></span>
+                            <span id="server-status-text" class="text-xs text-medical-secondary">Connecting to AI server...</span>
+                        </div>
                         <button type="submit" form="ckd-form" id="predict-btn" class="w-full bg-medical-accent hover:bg-medical-accentHover text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2">
                             <span id="btn-text">Run Diagnostic Analysis</span>
                             <svg id="btn-loader" class="animate-spin h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

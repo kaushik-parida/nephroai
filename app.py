@@ -6,7 +6,9 @@ from flask_cors import CORS
 warnings.filterwarnings("ignore", category=UserWarning)
 
 app = Flask(__name__, static_folder='nephroai')
-CORS(app)
+
+# Allow all origins — frontend is on Netlify, backend on Render
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 FEATURE_NAMES = [
     'age','bp','sg','al','su','rbc','pc','pcc','ba',
@@ -19,12 +21,12 @@ model = scaler = explainer = None
 def load_resources():
     global model, scaler, explainer
     try:
-        model    = joblib.load("xgboost_ckd_model.pkl")
-        scaler   = joblib.load("scaler.pkl")
+        model     = joblib.load("xgboost_ckd_model.pkl")
+        scaler    = joblib.load("scaler.pkl")
         explainer = shap.TreeExplainer(model)
         print("[OK] Models loaded.")
     except Exception as e:
-        print(f"[ERROR] {e}")
+        print(f"[ERROR] Failed to load models: {e}")
 
 load_resources()
 
@@ -36,9 +38,17 @@ def index():
 def static_files(path):
     return send_from_directory('nephroai', path)
 
+@app.route('/api/ping')
+def ping():
+    """Lightweight keepalive endpoint — call this to wake the Render instance."""
+    return jsonify({"status": "ok"})
+
 @app.route('/api/status')
 def status():
-    return jsonify({"status": "active", "models_loaded": model is not None})
+    return jsonify({
+        "status": "active",
+        "models_loaded": model is not None
+    })
 
 @app.route('/api/models-data')
 def models_data():
@@ -55,10 +65,15 @@ def models_data():
         ]
     })
 
-@app.route('/api/predict', methods=['POST'])
+@app.route('/api/predict', methods=['POST', 'OPTIONS'])
 def predict():
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = app.make_default_options_response()
+        return response
+
     if model is None:
-        return jsonify({"error": "Models not loaded."}), 500
+        return jsonify({"error": "Models not loaded on server."}), 500
     try:
         data   = request.json
         row    = [float(data.get(f, 0.0)) for f in FEATURE_NAMES]

@@ -752,59 +752,106 @@ function renderShapChart(shapData) {
 }
 
 function initDiagnosticForm() {
-  const form = document.getElementById('ckd-form');
-  const btnText = document.getElementById('btn-text');
+  const form      = document.getElementById('ckd-form');
+  const btnText   = document.getElementById('btn-text');
   const btnLoader = document.getElementById('btn-loader');
-  
+  const predictBtn = document.getElementById('predict-btn');
+
   if (!form) return;
+
+  // ── Helper: show a non-blocking toast-style error in the result panel ──
+  function showErrorInPanel(msg) {
+    const placeholder  = document.getElementById('result-placeholder');
+    const resultActive = document.getElementById('result-active');
+    if (resultActive) {
+      resultActive.classList.add('hidden');
+      resultActive.classList.remove('result-active-show');
+    }
+    if (placeholder) {
+      placeholder.classList.remove('hidden');
+      placeholder.innerHTML = `
+        <div class="w-16 h-16 bg-red-50 text-red-400 rounded-full flex items-center justify-center mb-4">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4
+                 c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <h3 class="font-bold text-red-500 mb-2">Connection Error</h3>
+        <p class="text-sm text-medical-secondary max-w-xs">${msg}</p>
+        <p class="text-xs text-medical-secondary mt-3 opacity-60">Backend: ${API_BASE_URL}</p>`;
+    }
+  }
+
+  // ── Helper: fetch with retry + cold-start wake-up message ──
+  async function fetchWithRetry(url, options, retries = 1) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        if (attempt === 1 && btnText) {
+          btnText.textContent = 'Waking up server…';
+        }
+        const controller = new AbortController();
+        const timeoutId  = setTimeout(() => controller.abort(), 65000); // 65s timeout
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res;
+      } catch (err) {
+        if (attempt === retries) throw err;
+        // Wait 3 seconds before retry
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    if (btnText) btnText.textContent = 'Processing...';
+
+    if (btnText)   btnText.textContent = 'Processing…';
     if (btnLoader) btnLoader.classList.remove('hidden');
-    
-    const placeholder = document.getElementById('result-placeholder');
+    if (predictBtn) predictBtn.disabled = true;
+
+    const placeholder  = document.getElementById('result-placeholder');
     const resultActive = document.getElementById('result-active');
-    
+
     if (placeholder) placeholder.classList.add('hidden');
     if (resultActive) {
       resultActive.classList.add('hidden');
       resultActive.classList.remove('result-active-show');
     }
 
-    const payload = {};
-    const inputPayload = {}; // for storing in patient history
-    
+    const payload      = {};
+    const inputPayload = {};
+
     FEATURES.forEach(f => {
       const val = parseFloat(document.getElementById(f.id).value);
-      payload[f.id] = val;
+      payload[f.id]      = val;
       inputPayload[f.id] = val;
     });
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/predict`, {
-        method: 'POST',
+      const res = await fetchWithRetry(`${API_BASE_URL}/api/predict`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+        body:    JSON.stringify(payload)
+      }, 1);
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Server prediction failed.');
+      if (!res.ok) throw new Error(data.error || 'Server returned an error.');
 
       const prob = data.probability;
       const pred = data.prediction;
-      
+
       const pctElement = document.getElementById('gauge-pct');
       if (pctElement) pctElement.textContent = (prob * 100).toFixed(1) + '%';
-      
+
       const color = pred === 1 ? '#EF4444' : '#10B981';
       drawGauge(prob, color);
 
       const badge = document.getElementById('verdict-badge');
-      const rec = document.getElementById('recommendation');
+      const rec   = document.getElementById('recommendation');
       if (pred === 1) {
         if (badge) {
-          badge.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-red-50 text-medical-red border-red-200';
+          badge.className  = 'px-3 py-1 rounded-full text-xs font-bold border bg-red-50 text-medical-red border-red-200';
           badge.textContent = 'High Risk (CKD)';
         }
         if (rec) {
@@ -813,7 +860,7 @@ function initDiagnosticForm() {
         }
       } else {
         if (badge) {
-          badge.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-green-50 text-medical-green border-green-200';
+          badge.className  = 'px-3 py-1 rounded-full text-xs font-bold border bg-green-50 text-medical-green border-green-200';
           badge.textContent = 'Low Risk (Healthy)';
         }
         if (rec) {
@@ -826,35 +873,37 @@ function initDiagnosticForm() {
         resultActive.classList.remove('hidden');
         resultActive.classList.add('result-active-show');
       }
-      
-      // Allow DOM rendering of canvas before loading Chart.js
+
       setTimeout(() => renderShapChart(data.shap_values), 80);
 
-      // Make "Save to History" button visible and attach click listener
       const saveBtn = document.getElementById('btn-save-history');
       if (saveBtn) {
         saveBtn.classList.remove('hidden');
-        // Recreate event listener to prevent duplicates
         const newSaveBtn = saveBtn.cloneNode(true);
         saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
         newSaveBtn.classList.remove('hidden');
-        
         newSaveBtn.addEventListener('click', () => {
           const patientNameInput = document.getElementById('patient-name-input');
           const name = patientNameInput ? patientNameInput.value.trim() : '';
           saveHistory(name, inputPayload, prob, pred);
-          alert('Diagnostic report successfully saved to Patient History!');
+          alert('Diagnostic report saved to Patient History!');
           newSaveBtn.classList.add('hidden');
           if (patientNameInput) patientNameInput.value = '';
         });
       }
 
     } catch (err) {
-      alert('Error: ' + err.message + '\nMake sure the backend is running at ' + API_BASE_URL);
-      if (placeholder) placeholder.classList.remove('hidden');
+      let msg = err.message;
+      if (err.name === 'AbortError') {
+        msg = 'Request timed out. The server may be starting up — please try again in 30 seconds.';
+      } else if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
+        msg = 'Could not reach the prediction server. It may be waking from sleep — please wait 30 seconds and try again.';
+      }
+      showErrorInPanel(msg);
     } finally {
-      if (btnText) btnText.textContent = 'Run Diagnostic Analysis';
-      if (btnLoader) btnLoader.classList.add('hidden');
+      if (btnText)    btnText.textContent = 'Run Diagnostic Analysis';
+      if (btnLoader)  btnLoader.classList.add('hidden');
+      if (predictBtn) predictBtn.disabled = false;
     }
   });
 }
@@ -889,6 +938,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Form submission
   initDiagnosticForm();
+
+  // ── Silent server warm-up on page load (avoids cold-start delay for user) ──
+  (function warmUpServer() {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const indicator = document.getElementById('server-status-dot');
+    const statusText = document.getElementById('server-status-text');
+    
+    if (isLocal) {
+      if (indicator) {
+        indicator.style.background = '#10B981'; // green
+        indicator.title = 'Local prediction server ready';
+      }
+      if (statusText) statusText.textContent = 'AI server online (Local)';
+      return;
+    }
+    
+    if (indicator) {
+      indicator.style.background = '#F59E0B'; // amber = warming up
+      indicator.title = 'Connecting to prediction server...';
+    }
+    if (statusText) statusText.textContent = 'Connecting to AI server...';
+    
+    fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' })
+      .then(r => {
+        if (r.ok) {
+          if (indicator) {
+            indicator.style.background = '#10B981'; // green = ready
+            indicator.title = 'Prediction server ready';
+          }
+          if (statusText) statusText.textContent = 'AI server online';
+        }
+      })
+      .catch(() => {
+        if (indicator) {
+          indicator.style.background = '#EF4444'; // red = offline
+          indicator.title = 'Server starting up (may take 1 min)';
+        }
+        if (statusText) statusText.textContent = 'Server starting up (30-60s)';
+      });
+  })();
+
 
   // Tab switcher logic (Manual Entry vs Lab Report Upload)
   const tabForm = document.getElementById('tab-manual-entry');
