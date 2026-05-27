@@ -271,5 +271,5 @@ MIT — see [LICENSE](LICENSE).
 ---
 
 <div align="center">
-  <sub>SOA University, Bhubaneswar · 2025</sub>
+  <sub>SOA University, Bhubaneswar · 2026</sub>
 </div>
