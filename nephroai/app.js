@@ -912,3 +912,80 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ─── MOBILE HAMBURGER MENU ─────────────────────────────────────────────────
+(function initMobileMenu() {
+  const btn        = document.getElementById('mobile-menu-btn');
+  const menu       = document.getElementById('mobile-menu');
+  const hamIcon    = document.getElementById('hamburger-icon');
+  const closeIcon  = document.getElementById('close-icon');
+
+  if (!btn || !menu) return;
+
+  function openMenu() {
+    menu.classList.remove('hidden');
+    menu.classList.add('menu-open');
+    hamIcon.classList.add('hidden');
+    closeIcon.classList.remove('hidden');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeMenu() {
+    menu.classList.add('hidden');
+    menu.classList.remove('menu-open');
+    hamIcon.classList.remove('hidden');
+    closeIcon.classList.add('hidden');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+
+  btn.addEventListener('click', () => {
+    menu.classList.contains('hidden') ? openMenu() : closeMenu();
+  });
+
+  // Close when a menu item is clicked
+  menu.querySelectorAll('a, button').forEach(el => {
+    el.addEventListener('click', closeMenu);
+  });
+
+  // Mobile Clinical/Research tab switching
+  const mobileClinical = document.getElementById('mobile-nav-clinical');
+  const mobileResearch = document.getElementById('mobile-nav-research');
+
+  if (mobileClinical) {
+    mobileClinical.addEventListener('click', () => {
+      const ev = new CustomEvent('switchView', { detail: 'clinical' });
+      document.dispatchEvent(ev);
+      // Sync active style
+      mobileClinical.classList.add('text-medical-accent', 'bg-cyan-50', 'border-cyan-100', 'font-semibold');
+      mobileResearch && mobileResearch.classList.remove('text-medical-accent', 'bg-cyan-50', 'border-cyan-100', 'font-semibold');
+    });
+  }
+
+  if (mobileResearch) {
+    mobileResearch.addEventListener('click', () => {
+      const ev = new CustomEvent('switchView', { detail: 'research' });
+      document.dispatchEvent(ev);
+      mobileResearch.classList.add('text-medical-accent', 'bg-cyan-50', 'border-cyan-100', 'font-semibold');
+      mobileClinical && mobileClinical.classList.remove('text-medical-accent', 'bg-cyan-50', 'border-cyan-100', 'font-semibold');
+    });
+  }
+
+  // Wire mobile history button to same handler as desktop
+  const mobileHistoryBtn = document.getElementById('btn-history-open-mobile');
+  const desktopHistoryBtn = document.getElementById('btn-history-open');
+  if (mobileHistoryBtn && desktopHistoryBtn) {
+    mobileHistoryBtn.addEventListener('click', () => desktopHistoryBtn.click());
+  }
+
+  // Close on resize to desktop
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 768) closeMenu();
+  });
+
+  // Flip cards: tap-to-flip on touch devices instead of hover
+  document.querySelectorAll('.flip-card').forEach(card => {
+    card.addEventListener('click', () => {
+      card.classList.toggle('flipped');
+    });
+  });
+})();

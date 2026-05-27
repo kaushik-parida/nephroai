@@ -1505,3 +1505,272 @@ footer p      { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.3
   width: 100%; height: 100%;
 }
 
+
+
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVE OVERRIDES
+   All breakpoints. Desktop layout untouched above.
+   Strategy: max-width media queries only.
+═══════════════════════════════════════════════════ */
+
+/* ── Tablet: ≤ 1024px ── */
+@media (max-width: 1024px) {
+  /* Pipeline: 3-col wrapping grid */
+  .pipeline-flow {
+    grid-template-columns: repeat(3, 1fr);
+    border-radius: 16px;
+  }
+  .pipe-step:nth-child(3) { border-right: none; }
+  .pipe-step:nth-child(4),
+  .pipe-step:nth-child(5),
+  .pipe-step:nth-child(6) { border-top: 1px solid var(--border); }
+
+  /* Analytics: single column */
+  .analytics-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  .wide-card { grid-column: 1; grid-row: auto; }
+
+  /* Contributions: 3-col */
+  .contributions-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Predict layout: stack */
+  .predict-layout { grid-template-columns: 1fr; }
+  .input-panel { max-height: none; }
+  .result-panel { position: static; max-height: none; }
+}
+
+/* ── Mobile: ≤ 768px ── */
+@media (max-width: 768px) {
+
+  /* === HERO === */
+  #hero { min-height: 100svh; }
+
+  .hero-content {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .hero-title {
+    font-size: clamp(1.9rem, 7vw, 2.6rem);
+    max-width: 100%;
+  }
+
+  .hero-sub { font-size: 0.95rem; max-width: 100%; }
+
+  .hero-actions { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  .btn-primary, .btn-ghost { width: 100%; text-align: center; padding: 0.9rem 1.5rem; }
+
+  /* Float cards hidden on small screens — they overlap text */
+  .float-card { display: none; }
+
+  /* === OVERVIEW / STATS === */
+  .stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    padding: 2rem 1.25rem;
+  }
+  .stat-item { border-right: none; border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; }
+  .stat-item:nth-child(odd)  { border-right: 1px solid var(--border); }
+  .stat-item:nth-child(3),
+  .stat-item:nth-child(4)   { border-bottom: none; }
+  .stat-num, .stat-num-pct { font-size: 2rem; }
+
+  /* === CONTRIBUTIONS === */
+  .contributions-grid { grid-template-columns: repeat(2, 1fr); }
+  .contrib-card-wide { grid-column: span 2; }
+
+  /* === PIPELINE === */
+  .pipeline-flow {
+    grid-template-columns: 1fr 1fr;
+    border-radius: 14px;
+  }
+  .pipe-step {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 0.75rem;
+  }
+  .pipe-step:nth-child(odd)  { border-right: 1px solid var(--border); }
+  .pipe-step:last-child { border-bottom: none; }
+
+  /* === PREDICT === */
+  #predict { padding: 0 1.25rem; }
+  .predict-header { padding: 2.5rem 0 1.5rem; }
+  .predict-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .input-panel { max-height: none; padding: 1.25rem; }
+  .result-panel { position: static; }
+
+  /* === ANALYTICS (clinical) === */
+  .analytics-grid { grid-template-columns: 1fr; gap: 1.25rem; }
+  .wide-card { grid-column: auto; grid-row: auto; }
+
+  /* === TEAM === */
+  .team-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+
+  /* === RESEARCH section spacing === */
+  #research { padding: 4rem 1.25rem; }
+
+  /* === FOOTER === */
+  footer { padding: 2.5rem 1.25rem 2rem; }
+
+  /* Chatbot widget: tuck slightly closer to edge */
+  .chatbot-widget { bottom: 16px; right: 16px; }
+
+  /* History sidebar full width on mobile */
+  .history-sidebar { width: 100%; right: -100%; }
+
+  /* Chatbot panel full width on tiny screens */
+  .chatbot-panel { width: calc(100vw - 2rem); right: 0; }
+}
+
+/* ── Small mobile: ≤ 480px ── */
+@media (max-width: 480px) {
+
+  /* Hero */
+  .hero-title { font-size: clamp(1.7rem, 8vw, 2.2rem); }
+  .hero-badge { font-size: 0.72rem; }
+
+  /* Stats 1-col */
+  .stats-strip { grid-template-columns: 1fr; }
+  .stat-item {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-item:last-child { border-bottom: none; }
+
+  /* Contributions 1-col */
+  .contributions-grid { grid-template-columns: 1fr; }
+  .contrib-card-wide { grid-column: span 1; }
+
+  /* Pipeline 1-col */
+  .pipeline-flow { grid-template-columns: 1fr; }
+  .pipe-step { border-right: none !important; }
+  .pipe-step:nth-child(odd) { border-right: none !important; }
+  .pipe-step:last-child { border-bottom: none; }
+
+  /* Team 1-col for tiny phones */
+  .team-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Predict form inputs: larger touch targets */
+  .field-group input,
+  .field-group select {
+    padding: 0.75rem 0.85rem;
+    font-size: 0.95rem;
+  }
+
+  /* Preset buttons: stack */
+  .preset-btn-container { flex-direction: column; }
+
+  /* Section padding */
+  .section-padded { padding: 3.5rem 1.25rem; }
+  .dark-section { padding: 3.5rem 1.25rem; }
+
+  /* Flip grid — 1 col on tiny screens */
+  .flip-grid { grid-template-columns: 1fr; }
+
+  /* XGBoost spotlight */
+  .xgboost-spotlight { padding: 1.5rem 1.25rem; }
+
+  /* Research chart: scrollable on mobile */
+  #research .grid.grid-cols-1.lg\:grid-cols-3 { grid-template-columns: 1fr; }
+}
+
+/* ── Clinical view (light theme) specific mobile fixes ── */
+@media (max-width: 768px) {
+
+  /* Hero section (clinical) */
+  #hero.clinical-view,
+  section#hero.clinical-view {
+    padding-top: 5rem;
+    padding-bottom: 3rem;
+  }
+
+  /* Hero two-col → single col */
+  #hero .grid.grid-cols-1.lg\:grid-cols-2 {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  /* Kidney image container: shorter on mobile */
+  #hero .relative.h-\[520px\] {
+    height: 260px;
+  }
+
+  /* Overview 5-col innovations → 2-col */
+  #overview .grid.grid-cols-1.md\:grid-cols-5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Pipeline 6-col → 2-col */
+  #pipeline .grid.grid-cols-1.md\:grid-cols-6 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Predict section: remove fixed height container */
+  #predict .h-\[550px\] {
+    height: auto;
+  }
+  #predict .grid.grid-cols-1.lg\:grid-cols-2 {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  /* Form card full width, no fixed height */
+  #predict .bg-white.rounded-2xl.flex.flex-col.h-full {
+    height: auto;
+    min-height: 400px;
+  }
+
+  /* Manual form grid: 1-col on mobile */
+  #form-num-grid,
+  #form-cat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Analytics: stack chart and why card */
+  #analytics .grid.grid-cols-1.lg\:grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Team: 2-col on mobile */
+  #team .grid.grid-cols-2.md\:grid-cols-5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Stats strip (clinical overview) — remove divide-x on mobile */
+  #overview .grid.grid-cols-2.md\:grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+    divide-x: none;
+  }
+
+  /* Verdict card: stack gauge and recommendation */
+  #result-active .flex.items-center.gap-8 {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  /* Research section lg:col-span-2 chart */
+  #research .grid.grid-cols-1.lg\:grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Mobile hamburger menu JS styles ── */
+#mobile-menu {
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+#mobile-menu.menu-open {
+  display: block !important;
+}
+
+/* Touch-friendly tap targets */
+@media (max-width: 768px) {
+  button, a, [role="button"] { min-height: 44px; }
+  .flip-card:hover .flip-card-inner { transform: none; }
+  .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+}
